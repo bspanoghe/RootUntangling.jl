@@ -1,0 +1,12 @@
+name = "RootUntangling"
+uuid = "48dc159f-3bce-43a5-8730-f61cab6c6d17"
+version = "0.1.0"
+authors = ["bspanogh <70662421+bspanoghe@users.noreply.github.com>"]
+
+[deps]
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+
+[compat]
+JuMP = "1.29"
+Plots = "1.41.4"

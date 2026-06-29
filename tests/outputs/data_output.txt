@@ -1,0 +1,19 @@
+ROI1
+Edge 82 connected to vertices ["bp_46 (409/488)"].
+Edge 85 connected to vertices ["bp_47 (413/493)"].
+Edge 83 connected to vertices ["bp_46 (409/488)"].
+
+ROI2
+
+ROI3
+Edge 33 connected to vertices ["bp_14 (2936/1397)"].
+
+ROI4
+The following cluster vertices were made: ["bp_14-ep_16", "bp_0-ep_1"]
+ROI5
+Edge 35 connected to vertices ["bp_16 (100/378)"].
+
+ROI6
+
+ROI7
+
