@@ -11,7 +11,7 @@ export get_subgraphs # separate graphs
 export solve_rsa, solve_rsa_simple, solve_rsa_fulloption # solving
 export get_he_classification_dict, get_se_classification_dict, get_roots # get results
 
-using JuMP, Plots
+using JuMP, Statistics, Plots
 
 include("data_reading.jl"); # read in data to dictionaries
 include("data_cleaning.jl"); # clean dictionaries to expected format for vertex and edge info
