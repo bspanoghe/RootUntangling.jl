@@ -156,16 +156,6 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
         @constraint(model, ep2f[e] == 0)
     end
 
-    # ## Exclusion of conflicting hypotheses
-
-    # For every hypervertex, at most one vertex per exclusion set may be active
-    # i.e. only one hypothesis is true for how many root segments are crossing that hypervertex
-    for v_h in Vₕ₀(sg)
-        for S_l in exclusion_sets(v_h)
-            @constraint(model, sum(v2f[v] for v in V₀(sg)[S_l]) <= 1)
-        end
-    end
-
     # ## Extras
 
     if !ismissing(num_roots)
