@@ -1,6 +1,6 @@
 using Pkg; Pkg.activate("./scripts")
 using RootUntangling
-import RootUntangling: Segment, MetaVertex, PreGraph, Vₕ₀, Vₕ₊, V₀, V₊, V, Vₕ, exclusion_sets, gethypervertex, HyperVertex, SingularVertex, neighbor, getsingularvertex, cosine_similarity, order
+import RootUntangling: Segment, MetaVertex, PreGraph, Vₕ₀, Vₕ₊, V₀, V₊, V, Vₕ, gethypervertex, HyperVertex, SingularVertex, neighbor, getsingularvertex, cosine_similarity
 
 # define supergraph
 pg = PreGraph(
@@ -16,8 +16,8 @@ pg = PreGraph(
         [i => MetaVertex(i, [:a, :b, :c, :d][i], [-1.0, 0.0, 1.0, 0.0][i], [0.0, 0.0, 0.0, 1.0][i]) for i in 1:4]...
     ])
 );
-n_h = 2;
-sg = get_supergraph(pg, n_h);
+pₛ = 0.1;
+sg = get_supergraph(pg; pₛ);
 
 # plotting
 plot(sg) isa Plots.Plot
@@ -41,35 +41,8 @@ issetequal(
     [1, 2, 3, 4]
 )
 
-# are exclusion sets correct
-hv = Vₕ₀(sg)[1];
-issetequal(exclusion_sets(hv), [[1, 2], [1, 3]])
-
-hv = Vₕ₀(sg)[2];
-issetequal(exclusion_sets(hv), [[4, 5], [4, 6]])
-
-n_h2 = 3;
-sg2 = get_supergraph(pg, n_h2);
-
-hv = Vₕ₀(sg2)[1];
-issetequal(exclusion_sets(hv), [[1, 2, 4], [1, 3, 5], [1, 3, 6]])
-
 # gethypervertex 
 id(gethypervertex(1, Vₕ₀(sg))) == 1
-
-# order of vertices
-hv = Vₕ(sg)[3]
-order(hv, vertices(hv)[1]) == 1
-order(hv, vertices(hv)[2]) == 2
-order(hv, vertices(hv)[3]) == 2
-
-hv = Vₕ(sg2)[3]
-order(hv, vertices(hv)[1]) == 1
-order(hv, vertices(hv)[2]) == 2
-order(hv, vertices(hv)[3]) == 2
-order(hv, vertices(hv)[4]) == 3
-order(hv, vertices(hv)[5]) == 3
-order(hv, vertices(hv)[6]) == 3
 
 # # singular vertices
 

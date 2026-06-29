@@ -3,18 +3,19 @@ using RootUntangling, RootUntangling.Plots
 
 file = "tests/outputs/sizes.csv"
 dist_threshold = 3
+pₛ_values = [0.1, 0.5]
 
 begin
     open(file, "w") do f
-        write(f, "roi, n_h, n_v, n_e, n_c")
+        write(f, "roi, p_s, n_v, n_e, n_c")
     end
 
-    for n_h in 2:3
+    for p_s in pₛ_values
         for roi_nr in 1:7
-            filename_segments = "./clouddata/branchpoints/ROI_$(roi_nr)/segment_info_with_coords.csv";
-            filename_vertices = "./clouddata/branchpoints/ROI_$(roi_nr)/bp1_segments_grouped.csv";
+            filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv";
+            filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv";
 
-            sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, num_hypotheses = n_h)
+            sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, pₛ, flip_y = true)
 
             connections_by_vertex = [
                 [
@@ -31,7 +32,7 @@ begin
             n_c = length(connections)
 
             open(file, "a") do f
-                write(f, "\n$roi_nr, $n_h, $n_v, $n_e, $n_c")
+                write(f, "\n$roi_nr, $p_s, $n_v, $n_e, $n_c")
             end
         end
     end
@@ -42,26 +43,26 @@ datadict = (
     (x -> split(x, ", ")) |>
     (x -> reduce(hcat, x)) |>
     permutedims |>
-    x -> [Symbol(c[1]) => parse.(Int64, c[2:end]) for c in eachcol(x)] |>
+    x -> [Symbol(c[1]) => parse.(Float64, c[2:end]) for c in eachcol(x)] |>
     Dict
 )
 
 begin
-    p_vc2 = scatter(datadict[:n_v][datadict[:n_h] .== 2], datadict[:n_c][datadict[:n_h] .== 2],
-        legend = false, title = "2 hypotheses"
+    p_vc2 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[1]], datadict[:n_c][datadict[:p_s] .== pₛ_values[1]],
+        legend = false, title = "pₛ = $(pₛ_values[1])"
     )
-    p_vc3 = scatter(datadict[:n_v][datadict[:n_h] .== 3], datadict[:n_c][datadict[:n_h] .== 3],
-        legend = false, title = "3 hypotheses", xlabel = "Number of vertices"
+    p_vc3 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[2]], datadict[:n_c][datadict[:p_s] .== pₛ_values[2]],
+        legend = false, title = "pₛ = $(pₛ_values[2])", xlabel = "Number of vertices"
     )
     plot(p_vc2, p_vc3, layout = (2, 1), ylabel = "Number of connections")
 end
 
 begin
-    p_ve2 = scatter(datadict[:n_v][datadict[:n_h] .== 2], datadict[:n_e][datadict[:n_h] .== 2],
-        legend = false, title = "2 hypotheses"
+    p_ve2 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[1]], datadict[:n_e][datadict[:p_s] .== pₛ_values[1]],
+        legend = false, title = "pₛ = $(pₛ_values[1])"
     )
-    p_ve3 = scatter(datadict[:n_v][datadict[:n_h] .== 3], datadict[:n_e][datadict[:n_h] .== 3],
-        legend = false, title = "3 hypotheses", xlabel = "Number of vertices"
+    p_ve3 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[2]], datadict[:n_e][datadict[:p_s] .== pₛ_values[2]],
+        legend = false, title = "pₛ = $(pₛ_values[2])", xlabel = "Number of vertices"
     )
     plot(p_ve2, p_ve3, layout = (2, 1), ylabel = "Number of edges")
 end
