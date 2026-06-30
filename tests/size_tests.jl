@@ -10,7 +10,7 @@ begin
         write(f, "roi, p_s, n_v, n_e, n_c")
     end
 
-    for p_s in pₛ_values
+    for pₛ in pₛ_values
         for roi_nr in 1:7
             filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv";
             filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv";
@@ -32,7 +32,7 @@ begin
             n_c = length(connections)
 
             open(file, "a") do f
-                write(f, "\n$roi_nr, $p_s, $n_v, $n_e, $n_c")
+                write(f, "\n$roi_nr, $pₛ, $n_v, $n_e, $n_c")
             end
         end
     end
