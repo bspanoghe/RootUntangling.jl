@@ -9,23 +9,57 @@ using Dates
 time = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0"*x : x) |> x -> x[1] * "-" * x[2]
 
 # choose boy
-roi_nr = 7
+roi_nr = 1
 
 # read data
 
 begin
-    pₛ = 0.1
+    nₕ_min = 1
+    pₛ = 0.2
     dist_threshold = 3
     flip_y = true
 
     filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv";
     filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv";
-    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, pₛ, flip_y);
-    plot(sg, size = (800, 1000), edge_kwargs = Dict(:linewidth => [width(he)/2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :)))
+    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, flip_y, pₛ, nₕ_min);
+
+    nₕs = [
+        maximum([length(vertices(hv)) for hv in RootUntangling.gethypervertex.(vertices(he), [Vₕ(sg)])])
+        for he in Eₕ(sg)
+    ]
+
+    plot(sg, size = (600, 800), label = false, edge_kwargs = 
+        Dict(
+            :linewidth => [width(he)/2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
+            # :linecolor => [HSV(80nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
+            :linecolor => [nₕ == 1 ? :red : :black for nₕ in nₕs] |> x -> reshape(x, 1, :),
+        ),
+    )
+    plot!(
+        fill(missing, 1, length(unique(nₕs))), fill(missing, 1, length(unique(nₕs))), 
+        lw = 2, legend = true, legendfontsize = 12,
+        label = reshape(sort(unique(nₕs)), 1, :), 
+        linecolor = reshape([HSV(80nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
+    )
 end
 
 length(V₀(sg))
 histogram([length(vertices(hv)) for hv in Vₕ₀(sg)])
+histogram(
+    [
+        maximum([length(vertices(hv)) for hv in RootUntangling.gethypervertex.(vertices(he), [Vₕ(sg)])])
+        for he in Eₕ(sg)
+    ]
+)
+
+[
+    he
+    for (nₕ, he) in zip(nₕs, Eₕ(sg))
+    if nₕ == 1
+]
+
+[vertices(hv) for hv in Vₕ₀(sg)]
+
 
 @time model = RootUntangling.solve_rsa(
     sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 13*60, hotstart_time = 2*60, 
