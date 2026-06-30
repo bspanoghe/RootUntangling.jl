@@ -1,5 +1,7 @@
 # place holder datatypes for edges, vertices and graphs
 
+isspecial(v::Integer) = v < 0
+
 mutable struct Segment{T, U}
     id::T
     vertices::Vector{T}
@@ -15,6 +17,8 @@ vertices(s::Segment) = s.vertices
 width(s::Segment) = s.width
 is_fake(s::Segment) = s.is_fake
 pred_primary(s::Segment) = s.pred_primary
+
+isspecial(s::Segment) = any(isspecial(v) for v in vertices(s))
 
 Base.allunique(ss::Vector{<:Segment}) = allunique(x -> sort(vertices(x)), ss)
 Base.unique(ss::Vector{<:Segment}) = unique(x -> sort(vertices(x)), ss)
@@ -41,7 +45,6 @@ y(mv::MetaVertex) = mv.y
 pred_split(mv::MetaVertex) = mv.pred_split
 
 isspecial(mv::MetaVertex) = id(mv) < 0
-isspecial(v::Integer) = v < 0
 coords(mv::MetaVertex) = [x(mv), y(mv)]
 distance(mv1::MetaVertex, mv2::MetaVertex) = (coords(mv1) - coords(mv2)).^2 |> sum |> sqrt
 

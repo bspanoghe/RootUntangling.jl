@@ -1,36 +1,3 @@
-# get the exclusion sets of a hypervertex `hv`
-function exclusion_sets(hv::HyperVertex)
-    n_h = num_hypotheses(hv)
-
-    S_idxs = [
-        [ones(Int64, level); zeros(Int64, n_h - level)]
-        for level in 1:n_h
-    ] |> 
-        x -> reduce(vcat, x) |>
-        cumsum |>
-        x -> reshape(x, (n_h, n_h)) |>
-        eachrow
-    
-    S = [vertices(hv)[S_l_idxs] for S_l_idxs in S_idxs]
-    
-    return S
-end
-
-num_hypotheses(hv::HyperVertex) = length(vertices(hv)) |> N -> (sqrt(1 + 8*N) - 1)/2 |> Int64 # from N = (n+1)*n / 2
-
-
-"""
-    order(hv::HyperVertex{T, U}, v::T)
-
-Calculate the order of a vertex `v`. 
-
-Considering the difference in id from every vertex from the hypervertex's root vertex, the lower bound of the set of vertices with order n is sum(1:(n-1)) and therefore the order in function of the difference in id Δx equals floor((1 + sqrt(8* Δx + 1))/2)
-"""
-order(hv::HyperVertex{T, U}, v::T) where {T, U} = (
-    v - vertices(hv)[1] |> x -> (1 + sqrt(8*x + 1))/2 |> x -> floor(Int64, x)
-)
-order(sv::SingularVertex) = order(hypervertex(sv), id(sv))
-
 polarity(se::SingularEdge{T, U}, sv::SingularVertex{T, U}) where {T, U} = src(se) == id(sv) ? 1 : -1
 
 
