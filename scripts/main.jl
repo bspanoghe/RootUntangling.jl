@@ -9,7 +9,7 @@ using Dates
 time = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0"*x : x) |> x -> x[1] * "-" * x[2]
 
 # choose boy
-roi_nr = 1
+roi_nr = 5
 
 # read data
 
@@ -27,39 +27,32 @@ begin
         maximum([length(vertices(hv)) for hv in RootUntangling.gethypervertex.(vertices(he), [Vₕ(sg)])])
         for he in Eₕ(sg)
     ]
+    nₕ₀s = [
+        maximum([length(vertices(hv)) for hv in RootUntangling.gethypervertex.(vertices(he), [Vₕ(sg)])])
+        for he in Eₕ₀(sg)
+    ]
+
+    ΔH = 80
 
     plot(sg, size = (600, 800), label = false, edge_kwargs = 
         Dict(
             :linewidth => [width(he)/2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
-            # :linecolor => [HSV(80nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
-            :linecolor => [nₕ == 1 ? :red : :black for nₕ in nₕs] |> x -> reshape(x, 1, :),
+            :linecolor => [HSV(ΔH*nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
         ),
     )
     plot!(
         fill(missing, 1, length(unique(nₕs))), fill(missing, 1, length(unique(nₕs))), 
         lw = 2, legend = true, legendfontsize = 12,
         label = reshape(sort(unique(nₕs)), 1, :), 
-        linecolor = reshape([HSV(80nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
+        linecolor = reshape([HSV(ΔH*nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
+    )
+    plot!(sg, [he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
+        label = false, color = HSV(ΔH, 1, 0.75), lw = 5
     )
 end
 
 length(V₀(sg))
-histogram([length(vertices(hv)) for hv in Vₕ₀(sg)])
-histogram(
-    [
-        maximum([length(vertices(hv)) for hv in RootUntangling.gethypervertex.(vertices(he), [Vₕ(sg)])])
-        for he in Eₕ(sg)
-    ]
-)
-
-[
-    he
-    for (nₕ, he) in zip(nₕs, Eₕ(sg))
-    if nₕ == 1
-]
-
-[vertices(hv) for hv in Vₕ₀(sg)]
-
+histogram(nₕ₀s)
 
 @time model = RootUntangling.solve_rsa(
     sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 13*60, hotstart_time = 2*60, 
