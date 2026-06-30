@@ -1,8 +1,8 @@
-function get_supergraph(pg::PreGraph; pₛ = 0.2)
-    n_hs = [get_num_hypotheses(pg, mv; pₛ) for mv in getmetavertices(pg) if !isspecial(mv)]
+function get_supergraph(pg::PreGraph; pₛ, nₕ_min)
+    nₕs = [get_num_hypotheses(pg, mv; pₛ, nₕ_min) for mv in getmetavertices(pg) if !isspecial(mv)]
 
     Vₕ₀ = [
-        get_hypervertex(pg, mv, n_hs, i)
+        get_hypervertex(pg, mv, nₕs, i)
         for (i, mv) in enumerate(getmetavertices(pg))
         if !isspecial(mv)
     ]
@@ -26,24 +26,24 @@ function get_supergraph(pg::PreGraph; pₛ = 0.2)
 end
 
 # get amount of hypotheses corresponding to a metavertex
-function get_num_hypotheses(pg::PreGraph, mv::MetaVertex; pₛ)
-    n_h = [get_num_hypotheses(pg, s; pₛ) for s in segments(pg, mv) if !isspecial(s)] |> maximum
+function get_num_hypotheses(pg::PreGraph, mv::MetaVertex; pₛ, nₕ_min)
+    nₕ = [get_num_hypotheses(pg, s; pₛ, nₕ_min) for s in segments(pg, mv) if !isspecial(s)] |> maximum
 
-    return n_h
+    return nₕ
 end
 
-function get_num_hypotheses(pg::PreGraph, s::Segment; pₛ)
+function get_num_hypotheses(pg::PreGraph, s::Segment; pₛ, nₕ_min)
     all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
     single_width = quantile(all_widths, pₛ)
-    n_h = div(width(s), single_width, RoundUp) |> Int
+    nₕ = nₕ_min + div(width(s), single_width, RoundDown) |> Int
 
-    return n_h
+    return nₕ
 end
 
 # instantiate a hypervertex based on a metavertex
-function get_hypervertex(pg::PreGraph{T, U, V}, mv::MetaVertex{T, U}, n_hs::Vector{<:Integer}, i::Integer) where {T, U, V}
-    prev_id = sum(n_hs[1:i-1]) # amount of vertices that have been defined in previous hypervertices
-    vertices = [i for i in prev_id+1:prev_id+n_hs[i]]
+function get_hypervertex(pg::PreGraph{T, U, V}, mv::MetaVertex{T, U}, nₕs::Vector{<:Integer}, i::Integer) where {T, U, V}
+    prev_id = sum(nₕs[1:i-1]) # amount of vertices that have been defined in previous hypervertices
+    vertices = [i for i in prev_id+1:prev_id+nₕs[i]]
 
     return HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv), vertices)
 end
@@ -70,8 +70,8 @@ function getsingularvertices(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, 
 end
 
 # method for doing all steps from file reading
-function get_supergraph(filename_segments::String, filename_vertices::String; dist_threshold::Real,
-        pₛ::Real, flip_y::Bool
+function get_supergraph(filename_segments::String, filename_vertices::String;
+        dist_threshold::Real, flip_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1
     )
     
     edge_data = read_data(filename_segments, :Segment_ID)
@@ -85,7 +85,7 @@ function get_supergraph(filename_segments::String, filename_vertices::String; di
     )
 
     pg = get_pregraph(edge_data_dict, vertex_data_dict; dist_threshold)
-    sg = get_supergraph(pg; pₛ)
+    sg = get_supergraph(pg; pₛ, nₕ_min)
 
     return sg
 end
