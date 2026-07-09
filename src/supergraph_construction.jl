@@ -43,7 +43,7 @@ end
 # instantiate a hypervertex based on a metavertex
 function get_hypervertex(pg::PreGraph{T, U, V}, mv::MetaVertex{T, U}, nₕs::Vector{<:Integer}, i::Integer) where {T, U, V}
     prev_id = sum(nₕs[1:i-1]) # amount of vertices that have been defined in previous hypervertices
-    vertices = [i for i in prev_id+1:prev_id+nₕs[i]]
+    vertices = collect(prev_id .+ (1:nₕs[i]))
 
     return HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv), vertices)
 end
