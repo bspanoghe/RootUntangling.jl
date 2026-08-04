@@ -162,13 +162,41 @@ function Plots.plot(sg::SuperGraph, se_classification_dict::Dict{<:RootUntanglin
 end
 
 
-
 # Root plotting
 function Plots.plot(rs::Vector{Root}; kwargs...)
     plot()
     for (i, r) in enumerate(rs)
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
-        plot!(xs(r), ys(r); color, label = "$i", linewidth = 2)
+        plot!(xs(r), ys(r); color, label = "$i", linewidth = 2, kwargs...)
     end
     plot!(aspect_ratio = :equal; kwargs...)
+end
+
+
+# custom plots
+function hypothesis_plot(sg::SuperGraph; ΔH = 80)
+    nₕs = [
+        maximum([length(vertices(hv)) for hv in gethypervertex.(vertices(he), [Vₕ(sg)])])
+        for he in Eₕ(sg)
+    ]
+    nₕ₀s = [
+        maximum([length(vertices(hv)) for hv in gethypervertex.(vertices(he), [Vₕ(sg)])])
+        for he in Eₕ₀(sg)
+    ]
+
+    plot(sg, size = (600, 800), label = false, edge_kwargs = 
+        Dict(
+            :linewidth => [width(he)/2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
+            :linecolor => [HSV(ΔH*nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
+        ),
+    )
+    plot!(
+        fill(missing, 1, length(unique(nₕs))), fill(missing, 1, length(unique(nₕs))), 
+        lw = 2, legend = true, legendfontsize = 12,
+        label = reshape(sort(unique(nₕs)), 1, :), 
+        linecolor = reshape([HSV(ΔH*nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
+    )
+    plot!(sg, [he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
+        label = false, color = HSV(ΔH, 1, 0.75), lw = 5
+    )
 end

@@ -24,7 +24,6 @@ function get_subgraphs(sg::SuperGraph; augmented_margins::Real = 0.1, pₛ = 0.2
     subgraphs = Vector{typeof(sg)}(undef, length(hv_clusters))
     for (i, hv_cluster) in enumerate(hv_clusters)
         id_conversion_dict = Dict([id.(hv_cluster); -3:-1] .=> [eachindex(hv_cluster); -3:-1])
-        typeof(hv_cluster) |> println
         nₕs = [get_num_hypotheses(hv_cluster, hv; pₛ, nₕ_min) for hv in hv_cluster]
 
         recreated_Vₕ₀ = [recreate_Vₕ₀(hv, id_conversion_dict, nₕs, i) for (i, hv) in enumerate(hv_cluster)]
