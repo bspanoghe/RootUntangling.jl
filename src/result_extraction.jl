@@ -11,10 +11,10 @@
 # end
 
 function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    e = [var for var in all_variables(model) if !isnothing(match(r"^e\[\d+\]$", JuMP.name(var)))]
-    eₚ = [var for var in all_variables(model) if !isnothing(match(r"^eₚ\[\d+\]$", JuMP.name(var)))]
+    ea = [var for var in all_variables(model) if !isnothing(match(r"^ea\[\d+\]$", JuMP.name(var)))]
+    ep = [var for var in all_variables(model) if !isnothing(match(r"^ep\[\d+\]$", JuMP.name(var)))]
 
-    se_classification_dict = [E(sg)[i] => round(Bool, value(eₚ[i])) + round(Bool, value(e[i]) - value(eₚ[i]))*im for i in eachindex(E(sg))] |> Dict
+    se_classification_dict = [E(sg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i]))*im for i in eachindex(E(sg))] |> Dict
 
     return se_classification_dict
 end

@@ -1,5 +1,5 @@
 function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = missing, hotstart_time = 0,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.75, ρₙₙ_max = 0.75, ρᵧ_max = 0.5, ρₜ_max = 0.75, ϵ = 1e-2, α_down = -pi/2
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ϵ = 1e-2, α_down = -pi/2
     )
 
     # check for NN prediction data #! remove for final version
@@ -19,11 +19,11 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
     n_he = length(Eₕ₀(sg))
     add_momentum && (n_c = length(E₂(sg)))
 
-    @variable(model, v[1:n_v], Bin) # is vertex active (part of the root)
-    @variable(model, vₚ[1:n_v], Bin) # is vertex part of the primary root
+    @variable(model, va[1:n_v], Bin) # is vertex active (part of the root)
+    @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
 
-    @variable(model, e[1:n_e], Bin) # is the edge active (part of the root)
-    @variable(model, eₚ[1:n_e], Bin) # is the edge part of the primary root
+    @variable(model, ea[1:n_e], Bin) # is the edge active (part of the root)
+    @variable(model, ep[1:n_e], Bin) # is the edge part of the primary root
     @variable(model, e₊[1:n_e], Bin) # is this a positive edge (should it follow the natural polarity of the edge)
         # note: the natural polarity of an edge is defined as going from the vertex with the lowest id to the one with the highest id
 
@@ -33,17 +33,16 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
     NN_pred && @variable(model, heₚ[1:n_he], Bin) # is this a primary hyperedge
 
     # connect model variables to graph's edges
-    
-    v2f = Dict([V₀(sg)[i] => v[i] for i in eachindex(V₀(sg))])
-    vp2f = Dict([V₀(sg)[i] => vₚ[i] for i in eachindex(V₀(sg))])
+    va2f = Dict([V₀(sg)[i] => va[i] for i in eachindex(V₀(sg))])
+    vp2f = Dict([V₀(sg)[i] => vp[i] for i in eachindex(V₀(sg))])
 
-    e2f = Dict([E(sg)[i] => e[i] for i in eachindex(E(sg))])
-    ep2f = Dict([E(sg)[i] => eₚ[i] for i in eachindex(E(sg))])
+    ea2f = Dict([E(sg)[i] => ea[i] for i in eachindex(E(sg))])
+    ep2f = Dict([E(sg)[i] => ep[i] for i in eachindex(E(sg))])
     e₊2f = Dict([E(sg)[i] => e₊[i] for i in eachindex(E(sg))])
 
     add_momentum && (c2f = Dict([E₂(sg)[i] => f[i] for i in eachindex(E₂(sg))]))
 
-    he2f = Dict([Eₕ₀(sg)[i] => he[i] for i in eachindex(Eₕ₀(sg))])
+    hea2f = Dict([Eₕ₀(sg)[i] => he[i] for i in eachindex(Eₕ₀(sg))])
     NN_pred && (hep2f = Dict(Eₕ₀(sg)[i] => heₚ[i] for i in eachindex(Eₕ₀(sg))))
 
     # define objective
@@ -52,12 +51,12 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
         Max,
         # appearance penalties
         sum(
-            e2f[e] * log(ρₐ / (1 - ρₐ))
+            ea2f[e] * log(ρₐ / (1 - ρₐ))
             for e in E(vₐ)
         ) +
         # standard hyperedges should be active
         sum(
-            he2f[he] * log(ρₕ / (1 - ρₕ))
+            hea2f[he] * log(ρₕ / (1 - ρₕ))
             for he in Eₕ₀(sg)
         ) + 
         # similar angles
@@ -73,7 +72,7 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
             for e in E₀(sg)
         ) +
         sum(
-            (e2f[e] - e₊2f[e]) * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))                
+            (ea2f[e] - e₊2f[e]) * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))                
             for e in E₀(sg)
         ) +
         # NN pred
@@ -99,35 +98,35 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
     # ### For a standard vertex:
     for v in V₀(sg)
         # It can only be classified as primary if active
-        @constraint(model, v2f[v] >= vp2f[v])
+        @constraint(model, va2f[v] >= vp2f[v])
         # It is an active vertex ⇔ it is connected to two active edges
-        @constraint(model, 2*v2f[v] == sum(e2f[e] for e in E(v)))
+        @constraint(model, 2*va2f[v] == sum(ea2f[e] for e in E(v)))
         # It is an active primary vertex ⇔ it is connected to two active primary edges
         @constraint(model, 2*vp2f[v] == sum(ep2f[e] for e in E(v)))
         # It has an incoming and an outgoing edge
-        @constraint(model, sum((e₊2f[e] - (e2f[e] - e₊2f[e]))*polarity(e, v) for e in E(v)) == 0)
+        @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e]))*polarity(e, v) for e in E(v)) == 0)
 
         # It is active ⇔ It has one active connection
-        add_momentum && @constraint(model, v2f[v] == sum(c2f[c] for c in E₂(v)))
+        add_momentum && @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
     end
 
     # ### For any edge:
     for e in E(sg)
         # It can only be classified if active
-        @constraint(model, e2f[e] >= ep2f[e])
-        @constraint(model, e2f[e] >= e₊2f[e])
+        @constraint(model, ea2f[e] >= ep2f[e])
+        @constraint(model, ea2f[e] >= e₊2f[e])
     end
 
     # ### For a connection:
     add_momentum && for c in E₂(sg)
         # It is active => its edges are active
-        @constraint(model, sum(e2f[e] for e in c) - 1 <= c2f[c])
+        @constraint(model, sum(ea2f[e] for e in c) - 1 <= c2f[c])
     end
 
     # ### For a hyperedge:
     for he in Eₕ₀(sg)
         # It is active => at least one of its edges is active
-        @constraint(model, he2f[he] <= sum(e2f[e] for e in E(sg, he)))
+        @constraint(model, hea2f[he] <= sum(ea2f[e] for e in E(sg, he)))
         # It is classified as primary => at least one of its edges is classified as primary
         NN_pred && @constraint(model, hep2f[he] <= sum(ep2f[e] for e in E(sg, he))) #! model can still choose to not classify he as primary
     end
@@ -136,11 +135,11 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
 
     # note: all augmented edges have a positive polarity by design
     # The appearance vertex has no incoming edges (edges are either inactive or follow natural polarity)
-    @constraint(model, sum((e2f[e] - e₊2f[e]) for e in E(vₐ)) == 0)
+    @constraint(model, sum((ea2f[e] - e₊2f[e]) for e in E(vₐ)) == 0)
     # The extinction vertex has no outgoing edges (edges are either inactive or opposite natural polarity)
     @constraint(model, sum(e₊2f[e] for e in E(vₑ)) == 0)
     # The splitting vertex has no incoming edges (edges are either inactive or follow natural polarity)
-    @constraint(model, sum((e2f[e] - e₊2f[e]) for e in E(vₛ)) == 0)
+    @constraint(model, sum((ea2f[e] - e₊2f[e]) for e in E(vₛ)) == 0)
     
     # ## Prerequisite for division
 
@@ -148,7 +147,7 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
     # i.e. lateral root segments can only appear in a hypervertex with an edge classified as a primary root
     for v in inner_vertices(sg) # outer nodes can never split
         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
-        @constraint(model, e2f[e_vₛ] <= sum(vp2f[v_roommate] for v_roommate in V(sg, Vₕ(v))))
+        @constraint(model, ea2f[e_vₛ] <= sum(vp2f[v_roommate] for v_roommate in V(sg, Vₕ(v))))
     end
 
     # Primary root segments cannot form from division
@@ -169,7 +168,7 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
     add_momentum || for v in V₀(sg)
         for he in Eₕ₀(v)
             es = filter(e -> id(v) in vertices(e), E(sg, he))
-            @constraint(model, sum(e2f[e] for e in es) <= 1)
+            @constraint(model, sum(ea2f[e] for e in es) <= 1)
         end
     end
 

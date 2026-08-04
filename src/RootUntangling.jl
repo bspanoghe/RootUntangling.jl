@@ -10,6 +10,7 @@ export Vₕ₀, Vₕ₊, V₀, V₊, Vₕ, V, Eₕ₀, Eₕ₊, E₀, E₊, Eₕ
 export get_subgraphs # separate graphs
 export solve_rsa, solve_rsa_simple, solve_rsa_fulloption # solving
 export get_he_classification_dict, get_se_classification_dict, get_roots # get results
+export hypothesis_plot
 
 using JuMP, Statistics, Plots
 
