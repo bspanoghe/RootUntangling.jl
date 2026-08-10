@@ -6,7 +6,7 @@ function get_pregraph(edge_data_dict::Dict, vertex_data_dict::Dict; dist_thresho
     segments = getsegments(metavertices, vertex_data_dict, edge_data_dict);
 
     # clean
-    remove_duplicates!(segments)
+    differentiate_duplicates!(metavertices, segments)
     remove_single_vertex_segments!(segments)
     cluster_vertices!(segments, metavertices; dist_threshold);
     remove_unconnected_vertices!(metavertices, segments)
@@ -44,7 +44,7 @@ function getsegments(metavertices::Vector{MetaVertex{T, U}}, vertex_data_dict, e
     end
 
     segments = [
-        Segment(id, vertices, [edge_data_dict[id][col] for col in [:width, :fake, :pred_primary]]...)
+        Segment(id, vertices, [edge_data_dict[id][col] for col in [:width, :fake, :pred_primary, :xs, :ys]]...)
         for (id, vertices) in segment_connections
     ]
 
@@ -53,13 +53,74 @@ end
 
 # # cleaning
 
-# ## remove duplicate segments (connecting same vertices)
-function remove_duplicates!(segments) #! take mean root length of duplicate segments?
-    allunique(segments) && return nothing
-    @info "$(length(segments) - length(unique(segments))) duplicate segments found. Removing duplicates."
-    unique!(segments)
+# ## break segments with identical vertices in two
+# adds new metavertices and segments to differentiate them
+# like so                                                
+#      /---\            /-o-\                              
+#   --o    o--   =>  --o    o--                                
+#     \---/            \-o-/                              
+function differentiate_duplicates!(metavertices::Vector{MetaVertex{T, U}},
+    segments::Vector{Segment{T, V}}) where {T, U, V}
+
+    # find "duplicate" segments
+    duplicates = duplicate_elements(s -> sort(vertices(s)), segments)
+    isempty(duplicates) && return nothing
+
+    # make new metavertices at halfpoints of duplicates
+    v_max = id.(metavertices) |> maximum
+    seg_id_max = id.(segments) |> maximum
+
+    mv_new = MetaVertex{T, U}[
+        MetaVertex(
+            v_max+i,
+            Symbol("hp_$(i)"),
+            xs(duplicates[i])[end ÷ 2] |> x -> convert(U, x),
+            ys(duplicates[i])[end ÷ 2] |> x -> convert(U, x),
+            zero(U)
+        )
+        for i in eachindex(duplicates)
+    ]
+
+    # make new segments between startpoint and new midpoint
+    seg_new = [
+        Segment{T, V}(
+            seg_id_max + i,
+            [vertices(duplicates[i])[1], id(mv_new[i])],
+            [f(duplicates[i]) for f in [width, is_fake, pred_primary, xs, ys]]...
+        )
+        for i in eachindex(duplicates)
+    ]
+
+    # replace startpoint with new halfpoint
+    for i in eachindex(duplicates)
+        vertices(duplicates[i])[1] = id(mv_new[i])
+    end
+
+    # add everything to variables
+    append!(metavertices, mv_new)
+    append!(segments, seg_new)
     
     return nothing
+end
+
+function duplicate_elements(v::Vector)
+    seen = Dict{eltype(v), Ref{Int}}() # ty julia discourse user oxinabox, and for making me read about Refs
+    for x in v
+        get!(() -> 0, seen, x)[] += 1
+    end
+    
+    return [x for x in v if seen[x][] > 1]
+end
+
+function duplicate_elements(f::Function, v::Vector)
+    v_id = f.(v)
+
+    seen = Dict{eltype(v_id), Ref{Int}}()
+    for x in v_id
+        get!(() -> 0, seen, x)[] += 1
+    end
+    
+    return [v[i] for i in eachindex(v) if seen[v_id[i]][] > 1]
 end
 
 # ## segment cleaning
@@ -98,7 +159,6 @@ end
 function get_vertex_clusters(segments::Vector{Segment{T, U}}, metavertices::Vector{<:MetaVertex{T}}, dist_threshold) where {T, U}
     ov_vertices = [vertices(s) for s in segments if length(vertices(s)) != 2] |>
         x -> reduce(vcat, x, init = T[]) |> unique # overconnected vertex ids
-    println(ov_vertices) #!
 
     vertex_clusters = Vector{T}[]
     for ov_vertex in ov_vertices
@@ -252,4 +312,26 @@ function get_pregraph(metavertices::Vector{MetaVertex{T, U}}, segments::Vector{S
     _metavertexdict = Dict(Pair.(_vertices, metavertices))
 
     return PreGraph(_vertices, _segments, _metavertexdict)
+end
+
+# # method for doing all steps from file reading
+function get_pregraph(filename_segments::String, filename_vertices::String;
+        dist_threshold::Real, flip_y::Bool
+    )
+
+    vertex_data = read_data(filename_vertices, :Node)
+    ymax = [vertex_datum[:Coord_y] for vertex_datum in values(vertex_data)] |> maximum
+    y_transform = flip_y ? y -> ymax .- y : identity
+    vertex_data_dict = get_vertex_info(vertex_data; segment_ids_colname = :Segment_IDs, x_colname = :Coord_x,
+        y_colname = :Coord_y, lateral_score_colname = :Lateral_Score, y_transform
+    )
+
+    edge_data = read_data(filename_segments, :Segment_ID)
+    edge_data_dict = get_edge_info(edge_data; dist_colname = :Mean_Distance, fake_colname = :Fake_Lateral,
+        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords, y_transform
+    )
+
+    pg = get_pregraph(edge_data_dict, vertex_data_dict; dist_threshold)
+
+    return pg
 end
