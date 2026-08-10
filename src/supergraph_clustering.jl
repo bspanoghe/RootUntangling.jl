@@ -86,17 +86,3 @@ function get_num_hypotheses(hes::Vector{<:HyperEdge}, he::HyperEdge; pₛ, nₕ_
 
     return nₕ
 end
-
-function get_num_hypotheses(pg::PreGraph, mv::MetaVertex; pₛ, nₕ_min)
-    nₕ = [get_num_hypotheses(pg, s; pₛ, nₕ_min) for s in segments(pg, mv) if !isspecial(s)] |> maximum
-
-    return nₕ
-end
-
-function get_num_hypotheses(pg::PreGraph, s::Segment; pₛ, nₕ_min)
-    all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
-    single_width = quantile(all_widths, pₛ)
-    nₕ = nₕ_min + div(width(s), single_width, RoundDown) |> Int
-
-    return nₕ
-end

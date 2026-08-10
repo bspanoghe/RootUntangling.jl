@@ -23,7 +23,8 @@ include("supergraph_functions.jl"); # functions that calculate
 include("supergraph_construction.jl"); # construct supergraph from preliminary graph
 include("supergraph_clustering.jl"); # cluster disconnected graphs in a supergraph
 include("solving.jl"); # solve problem based on supergraph
-include("result_extraction.jl") # get results from model
+include("root_extraction.jl") # get roots from model
+include("root_postprocessing.jl") # postprocessing
 include("plotting.jl"); # visualisation
 
 end
