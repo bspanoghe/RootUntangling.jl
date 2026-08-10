@@ -1,15 +1,6 @@
 # # classification of graph edges
 # one graph
 
-# function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
-#     eₚ = [var for var in all_variables(model) if !isnothing(match(r"^eₚ\[\d+\]$", JuMP.name(var)))]
-#     eₗ = [var for var in all_variables(model) if !isnothing(match(r"^eₗ\[\d+\]$", JuMP.name(var)))]
-
-#     se_classification_dict = [E(sg)[i] => round(Bool, value(eₚ[i])) + round(Bool, value(eₗ[i]))*im for i in eachindex(E(sg))] |> Dict
-
-#     return se_classification_dict
-# end
-
 function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
     ea = [var for var in all_variables(model) if !isnothing(match(r"^ea\[\d+\]$", JuMP.name(var)))]
     ep = [var for var in all_variables(model) if !isnothing(match(r"^ep\[\d+\]$", JuMP.name(var)))]
@@ -55,25 +46,29 @@ struct Root{T, U}
     vertex_ids::Vector{T}
     xs::Vector{U}
     ys::Vector{U}
-    function Root(is_primary, vertex_ids, xs, ys)
+    edges::Vector{<:SingularEdge}
+    function Root(is_primary, vertex_ids, xs, ys, edges)
         @assert length(vertex_ids) == length(xs) == length(ys)
-        return new{eltype(vertex_ids), eltype(xs)}(is_primary, vertex_ids, xs, ys)
+        return new{eltype(vertex_ids), eltype(xs)}(is_primary, vertex_ids, xs, ys, edges)
     end
 end
 is_primary(r::Root) = r.is_primary
 vertex_ids(r::Root) = r.vertex_ids
 xs(r::Root) = r.xs
 ys(r::Root) = r.ys
+edges(r::Root) = r.edges
 
 function Root(
-        se::SingularEdge{T, U}, se_classification_dict::Dict{SingularEdge{T, U}, Complex{Int64}}, sg::SuperGraph{T, U}
+        se::SingularEdge{T, U}, se_classification_dict::Dict{SingularEdge{T, U}, Complex{Int64}},
+        sg::SuperGraph{T, U}
     ) where {T, U}
     @assert haskey(se_classification_dict, se)
     Root(
         real(se_classification_dict[se]) == 1,
         [vertices(se)...],
         xs(sg, se),
-        ys(sg, se)
+        ys(sg, se),
+        [se]
     )
 end
 
@@ -85,19 +80,24 @@ function get_roots(sg::SuperGraph, model::JuMP.Model)
     while !isempty(active_edges)
         current_root = Root(active_edges[1], se_classification_dict, sg)
         deleteat!(active_edges, 1)
-        edge_idx = findfirst(x -> are_connected(current_root, x), active_edges)
+        edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
         while !isnothing(edge_idx)
-            push!(current_root, active_edges[edge_idx], sg)
+            grow!(current_root, active_edges[edge_idx], sg)
             deleteat!(active_edges, edge_idx)
-            edge_idx = findfirst(x -> are_connected(current_root, x), active_edges)
+            edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
         end
         push!(roots, current_root)
     end
 
+    sort!(roots, by = r -> is_primary(r), rev = true)
+
     return roots
 end
+are_connected(r::Root{T, U}, se::SingularEdge{T, U}) where {T, U} = (
+    !isempty(intersect(vertex_ids(r)[[1, end]], vertices(se)))
+)
 
-function Base.push!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U}) where {T, U}
+function grow!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U}) where {T, U}
     new_vertex_idx = findfirst(x -> !(x in vertex_ids(r)[[1, end]]), vertices(se))
     if isnothing(new_vertex_idx)
         @warn "Loop found in root"
@@ -112,14 +112,13 @@ function Base.push!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U})
         pushfirst!(vertex_ids(r), new_vertex)
         pushfirst!(xs(r), x(new_sv))
         pushfirst!(ys(r), y(new_sv))
+        pushfirst!(edges(r), se)
     else
         push!(vertex_ids(r), new_vertex)
         push!(xs(r), x(new_sv))
         push!(ys(r), y(new_sv))
+        push!(edges(r), se)
     end
 
     return nothing
 end
-are_connected(r::Root{T, U}, se::SingularEdge{T, U}) where {T, U} = (
-    !isempty(intersect(vertex_ids(r)[[1, end]], vertices(se)))
-)

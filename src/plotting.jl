@@ -95,7 +95,7 @@ end
 
 # with classification
 # ## hyperedges
-function Plots.plot!(sg::SuperGraph, he_classification_dict::Dict{<:RootUntangling.HyperEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot!(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     classification_edge_kwargs = Dict(
         :color => [(real(he_classification_dict[he]) > 0) * RGB(1.0, 0, 0) + (imag(he_classification_dict[he]) > 0) * RGB(0, 0, 1.0) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
         :linewidth => [abs(he_classification_dict[he]) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
@@ -114,7 +114,7 @@ function Plots.plot!(sg::SuperGraph, he_classification_dict::Dict{<:RootUntangli
     return p
 end
 
-function Plots.plot(sg::SuperGraph, he_classification_dict::Dict{<:RootUntangling.HyperEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     p = plot(; aspect_ratio, legend, kwargs...)
     plot!(sg, he_classification_dict; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
 
@@ -135,7 +135,7 @@ function Plots.plot(sgs::Vector{SuperGraph{T, U}}, he_classification_dict::Dict{
 end
 
 # ## singular edges
-function Plots.plot!(sg::SuperGraph, se_classification_dict::Dict{<:RootUntangling.SingularEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot!(sg::SuperGraph, se_classification_dict::Dict{<:SingularEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     classification_edge_kwargs = Dict(
         :color => [(real(se_classification_dict[he]) > 0) * RGB(1.0, 0, 0) + (imag(se_classification_dict[he]) > 0) * RGB(0, 0, 1.0) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
         :linewidth => [abs(se_classification_dict[he]) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
@@ -154,7 +154,7 @@ function Plots.plot!(sg::SuperGraph, se_classification_dict::Dict{<:RootUntangli
     return p
 end
 
-function Plots.plot(sg::SuperGraph, se_classification_dict::Dict{<:RootUntangling.SingularEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot(sg::SuperGraph, se_classification_dict::Dict{<:SingularEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     p = plot(; aspect_ratio, legend, kwargs...)
     plot!(sg, se_classification_dict; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
 
@@ -163,11 +163,17 @@ end
 
 
 # Root plotting
+function Plots.plot(r::Root; kwargs...)
+    linestyle = is_primary(r) ? :solid : :dot
+    plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
+end
+
 function Plots.plot(rs::Vector{Root}; kwargs...)
     plot()
     for (i, r) in enumerate(rs)
+        linestyle = is_primary(r) ? :solid : :dot
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
-        plot!(xs(r), ys(r); color, label = "$i", linewidth = 2, kwargs...)
+        plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 0.5, kwargs...)
     end
     plot!(aspect_ratio = :equal; kwargs...)
 end
@@ -196,7 +202,7 @@ function hypothesis_plot(sg::SuperGraph; ΔH = 80)
         label = reshape(sort(unique(nₕs)), 1, :), 
         linecolor = reshape([HSV(ΔH*nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
     )
-    plot!(sg, [he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
+    plot!(sg, HyperEdge[he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
         label = false, color = HSV(ΔH, 1, 0.75), lw = 5
     )
 end

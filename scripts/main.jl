@@ -9,7 +9,7 @@ using Dates
 today = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0"*x : x) |> x -> x[1] * "-" * x[2]
 
 # choose boy
-roi_nr = 15
+roi_nr = 5
 
 # read data
 
@@ -26,7 +26,6 @@ begin
     hypothesis_plot(sg)
 end
 
-length(V₀(sg))
 histogram(length.(vertices.(Vₕ₀(sg))))
 
 model, time =  @timed RootUntangling.solve_rsa(
@@ -36,12 +35,13 @@ model, time =  @timed RootUntangling.solve_rsa(
 
 roots = get_roots(sg, model);
 plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min")
+savefig(homedir() * "/Downloads/test.svg")
 savefig("results/roi$(roi_nr)_roots_$(today).svg")
 
 # multi
 
-sgs = get_subgraphs(sg; pₛ, nₕ_min)
-sgs = filter(x -> length(x) > 50, sgs)
+sgs = get_subgraphs(sg; pₛ, nₕ_min);
+sgs = filter(x -> length(x) > 50, sgs);
 
 begin
     plot(legend = false)
@@ -51,7 +51,7 @@ begin
     plot!()
 end
 
-subidx = 1
+subidx = 2
 plot(sgs[subidx], size = (1000, 800))
 savefig(homedir() * "\\Downloads\\wa.svg")
 hypothesis_plot(sgs[subidx])
@@ -65,7 +65,7 @@ plot(sgs[subidx], get_he_classification_dict(sgs[subidx], model), size = (800, 8
 savefig("results/roi$(roi_nr)-$(subidx)_classification_$(today).svg")
 
 roots = get_roots(sgs[subidx], model)
-plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min", linewidth = 0.5)
+plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min", lw = 1)
 savefig("results/roi$(roi_nr)-$(subidx)_roots_$(today).svg")
 
 # NN predictions
@@ -76,3 +76,31 @@ plot(
     vertex_kwargs = Dict(:color => [HSV(120, 1, pred_split(hv)) for hv in Vₕ(sgs[subidx])])
 )
 savefig(homedir() * "\\Downloads\\wa.svg")
+
+# testing grounds
+
+i = 1
+begin
+    r = roots[i]
+    i += 1
+    plot(r, title = "$(RootUntangling.tortuosity(r))")
+end
+
+he_classification_dict = RootUntangling.get_he_classification_dict(sg, model)
+se_classification_dict = RootUntangling.get_se_classification_dict(sg, model)
+
+edge_groups = [
+    [
+        se
+        for se in E(sg, he)
+        if abs(se_classification_dict[se]) > 0
+    ] 
+    for he in Eₕ₀(sg)
+] |> v -> filter(x -> length(x) >= 2, v)
+
+begin
+    rr = roots[3]
+    plot(roots, label = nothing)
+    plot!(sg, reduce(vcat, edge_groups), color = :pink, lw = 5, alpha = 0.3, label = nothing)
+    annotate!([(xs(rr)[i], ys(rr)[i], "$i", 6) for i in eachindex(xs(rr))])
+end
