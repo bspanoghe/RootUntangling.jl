@@ -74,17 +74,7 @@ function get_supergraph(filename_segments::String, filename_vertices::String;
         dist_threshold::Real, flip_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1
     )
     
-    edge_data = read_data(filename_segments, :Segment_ID)
-    edge_data_dict = get_edge_info(edge_data, dist_colname = :Mean_Distance, fake_colname = :Fake_Lateral,
-        primary_score_colname = :Heatmap_Mean
-    )
-
-    vertex_data = read_data(filename_vertices, :Node)
-    vertex_data_dict = get_vertex_info(vertex_data; flip_y, segment_ids_colname = :Segment_IDs,
-        x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score
-    )
-
-    pg = get_pregraph(edge_data_dict, vertex_data_dict; dist_threshold)
+    pg = get_pregraph(filename_segments, filename_vertices; dist_threshold, flip_y)
     sg = get_supergraph(pg; pₛ, nₕ_min)
 
     return sg

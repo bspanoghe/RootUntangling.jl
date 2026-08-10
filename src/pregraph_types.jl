@@ -8,21 +8,24 @@ mutable struct Segment{T, U}
     width::U
     is_fake::Bool
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove later
+    xs::Vector{<:Number}
+    ys::Vector{<:Number}
 end
-Segment(id::T, vertices::Vector{T}, width::U, is_fake, pred_primary::Union{U, Missing}) where {T, U} = Segment(id, vertices, width, Bool(is_fake), pred_primary)
+Segment(id::T, vertices::Vector{T}, width::U, is_fake,
+    pred_primary::Union{U, Missing}, xs, ys) where {T, U} = (
+    Segment(id, vertices, width, Bool(is_fake), pred_primary, xs, ys)
+)
 
-Segment(id, vertices) = Segment(id, vertices, NaN, false, NaN)
+Segment(id, vertices) = Segment(id, vertices, NaN, false, NaN, Number[], Number[])
 id(s::Segment) = s.id
 vertices(s::Segment) = s.vertices
 width(s::Segment) = s.width
 is_fake(s::Segment) = s.is_fake
 pred_primary(s::Segment) = s.pred_primary
+xs(s::Segment) = s.xs
+ys(s::Segment) = s.ys
 
 isspecial(s::Segment) = any(isspecial(v) for v in vertices(s))
-
-Base.allunique(ss::Vector{<:Segment}) = allunique(x -> sort(vertices(x)), ss)
-Base.unique(ss::Vector{<:Segment}) = unique(x -> sort(vertices(x)), ss)
-Base.unique!(ss::Vector{<:Segment}) = unique!(x -> sort(vertices(x)), ss)
 
 mutable struct MetaVertex{T, U}
     id::T
