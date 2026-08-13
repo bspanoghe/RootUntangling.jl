@@ -1,4 +1,4 @@
-# # classification of graph edges
+# # classification of graph edges/vertices
 # one graph
 
 function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
@@ -15,6 +15,22 @@ function get_he_classification_dict(sg::SuperGraph, model::JuMP.Model)
     he_classification_dict = [he => sum([se_classification_dict[e] for e in E(sg, he)]) for he in Eₕ(sg)] |> Dict
 
     return he_classification_dict
+end
+
+function get_sv_classification_dict(sg::SuperGraph, model::JuMP.Model)
+    va = [var for var in all_variables(model) if !isnothing(match(r"^va\[\d+\]$", JuMP.name(var)))]
+    vp = [var for var in all_variables(model) if !isnothing(match(r"^vp\[\d+\]$", JuMP.name(var)))]
+
+    sv_classification_dict = [V₀(sg)[i] => round(Bool, value(vp[i])) + round(Bool, value(va[i]) - value(vp[i]))*im for i in eachindex(V₀(sg))] |> Dict
+
+    return sv_classification_dict
+end
+
+function get_hv_classification_dict(sg::SuperGraph, model::JuMP.Model)
+    sv_classification_dict = get_sv_classification_dict(sg, model)
+    hv_classification_dict = [hv => sum([sv_classification_dict[v] for v in V(sg, hv)]) for hv in Vₕ₀(sg)] |> Dict
+
+    return hv_classification_dict
 end
 
 # multiple graphs
@@ -43,20 +59,16 @@ end
 
 struct Root{T, U}
     is_primary::Bool
-    vertex_ids::Vector{T}
-    xs::Vector{U}
-    ys::Vector{U}
-    edges::Vector{<:SingularEdge}
-    function Root(is_primary, vertex_ids, xs, ys, edges)
-        @assert length(vertex_ids) == length(xs) == length(ys)
-        return new{eltype(vertex_ids), eltype(xs)}(is_primary, vertex_ids, xs, ys, edges)
-    end
+    V::Vector{SingularVertex{T, U}}
 end
 is_primary(r::Root) = r.is_primary
-vertex_ids(r::Root) = r.vertex_ids
-xs(r::Root) = r.xs
-ys(r::Root) = r.ys
-edges(r::Root) = r.edges
+V(r::Root) = r.V
+
+vertices(r::Root) = id.(V(r))
+xs(r::Root) = x.(V(r))
+ys(r::Root) = y.(V(r))
+
+Base.length(r::Root) = length(r.V)
 
 function Root(
         se::SingularEdge{T, U}, se_classification_dict::Dict{SingularEdge{T, U}, Complex{Int64}},
@@ -65,10 +77,7 @@ function Root(
     @assert haskey(se_classification_dict, se)
     Root(
         real(se_classification_dict[se]) == 1,
-        [vertices(se)...],
-        xs(sg, se),
-        ys(sg, se),
-        [se]
+        [getsingularvertex(sg, v) for v in vertices(se)],
     )
 end
 
@@ -80,12 +89,14 @@ function get_roots(sg::SuperGraph, model::JuMP.Model)
     while !isempty(active_edges)
         current_root = Root(active_edges[1], se_classification_dict, sg)
         deleteat!(active_edges, 1)
+
         edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
         while !isnothing(edge_idx)
             grow!(current_root, active_edges[edge_idx], sg)
             deleteat!(active_edges, edge_idx)
             edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
         end
+
         push!(roots, current_root)
     end
 
@@ -94,30 +105,23 @@ function get_roots(sg::SuperGraph, model::JuMP.Model)
     return roots
 end
 are_connected(r::Root{T, U}, se::SingularEdge{T, U}) where {T, U} = (
-    !isempty(intersect(vertex_ids(r)[[1, end]], vertices(se)))
+    !isempty(intersect(vertices(r)[[1, end]], vertices(se)))
 )
 
 function grow!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U}) where {T, U}
-    new_vertex_idx = findfirst(x -> !(x in vertex_ids(r)[[1, end]]), vertices(se))
+    new_vertex_idx = findfirst(x -> !(x in vertices(r)[[1, end]]), vertices(se))
     if isnothing(new_vertex_idx)
         @warn "Loop found in root"
-        new_vertex = vertex_ids(r)[1]
+        new_vertex = vertices(r)[1]
     else
         new_vertex = vertices(se)[new_vertex_idx]
     end
-    new_sv = getsingularvertex(sg, new_vertex)
 
-    is_upstream = vertex_ids(r)[1] in vertices(se)
+    is_upstream = vertices(r)[1] in vertices(se)
     if is_upstream
-        pushfirst!(vertex_ids(r), new_vertex)
-        pushfirst!(xs(r), x(new_sv))
-        pushfirst!(ys(r), y(new_sv))
-        pushfirst!(edges(r), se)
+        pushfirst!(V(r), getsingularvertex(sg, new_vertex))
     else
-        push!(vertex_ids(r), new_vertex)
-        push!(xs(r), x(new_sv))
-        push!(ys(r), y(new_sv))
-        push!(edges(r), se)
+        push!(V(r), getsingularvertex(sg, new_vertex))
     end
 
     return nothing
