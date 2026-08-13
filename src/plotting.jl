@@ -168,7 +168,7 @@ function Plots.plot(r::Root; kwargs...)
     plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
 end
 
-function Plots.plot(rs::Vector{Root}; kwargs...)
+function Plots.plot(rs::Vector{<:Root}; kwargs...)
     plot()
     for (i, r) in enumerate(rs)
         linestyle = is_primary(r) ? :solid : :dot
@@ -176,6 +176,19 @@ function Plots.plot(rs::Vector{Root}; kwargs...)
         plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 0.5, kwargs...)
     end
     plot!(aspect_ratio = :equal; kwargs...)
+end
+
+function Plots.plot!(r::Root; kwargs...)
+    linestyle = is_primary(r) ? :solid : :dot
+    plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
+end
+
+function Plots.plot!(rs::Vector{<:Root}; kwargs...)
+    for (i, r) in enumerate(rs)
+        linestyle = is_primary(r) ? :solid : :dot
+        color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
+        plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 0.5, kwargs...)
+    end
 end
 
 
