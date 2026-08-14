@@ -4,11 +4,12 @@ using Pkg; Pkg.activate("./scripts")
 using RootUntangling, RootUntangling.Plots
 using JuMP
 using HiGHS, Gurobi
+using Metaheuristics
 using Dates
 ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-roi_nr = 15
+roi_nr = 1
 
 # read data
 
@@ -28,7 +29,7 @@ begin
 end
 
 model, time =  @timed RootUntangling.solve_rsa(
-    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 13*60, hotstart_time = 2*60, 
+    sg; optimizer = HiGHS.Optimizer, add_momentum = true, time_limit = 10*60, hotstart_time = 2*60, 
     num_roots = 1, ρₐ = 0.01, ρₕ = 0.9
 )
 
@@ -78,6 +79,7 @@ savefig(homedir() * "\\Downloads\\wa.svg")
 
 # testing grounds
 
+## tort tests
 i = 1
 begin
     r = roots[i]
@@ -85,18 +87,29 @@ begin
     plot(r, title = "$(RootUntangling.tortuosity(r))")
 end
 
-
-import RootUntangling: get_linear_chains, find_overlaps
-
-sg = sgs[1]
-overlap_dict = find_overlaps(sg, model, roots)
+## does switching work
 begin
-    plot(roots)
-    for (k, v) in overlap_dict
-        plot!(sg, k, color = :yellow, linestyle = :solid, lw = 2, alpha = 0.3, label = false)
-    end
-    plot!()
-end
-savefig(homedir() * "/Downloads/awawa2.svg")
+    roots = get_roots(sg, model)
+    overlap_dict = find_overlaps(sg, model, roots)
+    overlap_edges = collect(keys(overlap_dict))
+    he = overlap_edges[1]
+    r1 = overlap_dict[he][1]
+    r2 = overlap_dict[he][2]
 
-overlap_edges = keys(overlap_dict)
+    p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
+    plot!(sg, he, color = :red, linestyle = :solid, lw = 5, alpha = 0.3)
+    RootUntangling.switch!(sg, he, r1, r2)
+    p_after = plot(roots, title = "Total tort: $(tortuosity(roots))")
+    plot!(sg, he, color = :red, linestyle = :solid, lw = 5, alpha = 0.3, label = false)
+    plot(p_before, p_after)
+end
+
+## does greedy search work
+begin
+    roots = get_roots(sg, model)
+    roots_improved = greedy_switch(sg, model, roots)
+
+    p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
+    p_after = plot(roots_improved, title = "Total tort: $(tortuosity(roots_improved))")
+    plot(p_before, p_after)
+end
