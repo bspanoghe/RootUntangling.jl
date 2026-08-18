@@ -4,12 +4,11 @@ using Pkg; Pkg.activate("./scripts")
 using RootUntangling, RootUntangling.Plots
 using JuMP
 using HiGHS, Gurobi
-using Metaheuristics
 using Dates
 ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-roi_nr = 1
+roi_nr = 14
 
 # read data
 
@@ -19,18 +18,18 @@ begin
     nₕ_min = 1
     pₛ = 0.2
     dist_threshold = 3
-    flip_y = true
+    reverse_y = true
 
     filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv";
     filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv";
-    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, flip_y, pₛ, nₕ_min);
+    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min);
 
     hypothesis_plot(sg)
 end
 
 model, time =  @timed RootUntangling.solve_rsa(
-    sg; optimizer = HiGHS.Optimizer, add_momentum = true, time_limit = 10*60, hotstart_time = 2*60, 
-    num_roots = 1, ρₐ = 0.01, ρₕ = 0.9
+    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 10*60, hotstart_time = 2*60, 
+    num_roots = 2, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5
 )
 
 roots = get_roots(sg, model);
@@ -41,7 +40,7 @@ savefig("results/roi$(roi_nr)_roots_$(today).svg")
 # multi
 
 sgs = get_subgraphs(sg; pₛ, nₕ_min) |> 
-    sgs -> filter(x -> length(x) > 20, sgs);
+    sgs -> filter(x -> length(x) > 50, sgs);
 
 begin
     plot(legend = false)
@@ -51,14 +50,14 @@ begin
     plot!()
 end
 
-subidx = 1
+subidx = 2
 
 plot(sgs[subidx], size = (1000, 800))
 hypothesis_plot(sgs[subidx])
 
 model, time = @timed RootUntangling.solve_rsa(
-    sgs[subidx]; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 13*60, hotstart_time = 2*60,
-    num_roots = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.75
+    sgs[subidx]; optimizer = Gurobi.Optimizer, time_limit = 13*60, hotstart_time = 2*60,
+    num_roots = 1
 )
 
 # plot(sgs[subidx], get_he_classification_dict(sgs[subidx], model), size = (800, 800))
@@ -88,9 +87,10 @@ begin
 end
 
 ## does switching work
+isdefined(Main, :sgs) && (sg = sgs[subidx]);
 begin
     roots = get_roots(sg, model)
-    overlap_dict = find_overlaps(sg, model, roots)
+    overlap_dict = RootUntangling.find_overlaps(sg, model, roots)
     overlap_edges = collect(keys(overlap_dict))
     he = overlap_edges[1]
     r1 = overlap_dict[he][1]
@@ -105,11 +105,13 @@ begin
 end
 
 ## does greedy search work
+isdefined(Main, :sgs) && (sg = sgs[subidx]);
 begin
     roots = get_roots(sg, model)
-    roots_improved = greedy_switch(sg, model, roots)
+    roots_improved = greedy_switch(sg, model, roots; max_tries = 100)
 
     p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
     p_after = plot(roots_improved, title = "Total tort: $(tortuosity(roots_improved))")
     plot(p_before, p_after)
 end
+savefig(homedir() * "/Downloads/tortitup.svg")
