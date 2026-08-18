@@ -10,8 +10,10 @@ mutable struct Segment{T, U}
     xs::Vector{<:Number}
     ys::Vector{<:Number}
 end
-Segment(id::T, vertices::Vector{T}, width::U,
-    pred_primary::Union{U, Missing}, xs, ys) where {T, U} = (
+Segment(
+    id::T, vertices::Vector{T}, width::U,
+    pred_primary::Union{U, Missing}, xs, ys
+) where {T, U} = (
     Segment(id, vertices, width, pred_primary, xs, ys)
 )
 
@@ -47,7 +49,7 @@ pred_split(mv::MetaVertex) = mv.pred_split
 
 isspecial(mv::MetaVertex) = id(mv) < 0
 coords(mv::MetaVertex) = [x(mv), y(mv)]
-distance(mv1::MetaVertex, mv2::MetaVertex) = (coords(mv1) - coords(mv2)).^2 |> sum |> sqrt
+distance(mv1::MetaVertex, mv2::MetaVertex) = (coords(mv1) - coords(mv2)) .^ 2 |> sum |> sqrt
 
 
 struct PreGraph{T, U, V}
@@ -57,8 +59,10 @@ struct PreGraph{T, U, V}
     neighbordict::Dict{T, Vector{T}}
 
     # check that ids of normal vertices equals `1:length(normal_vertices)` and ids of special vertices equals `-1:-length(special_vertices)`
-    function PreGraph(vertices::Vector{T}, segments::Vector{Segment{T, U}},
-        metavertexdict::Dict{T, MetaVertex{T, V}}, neighbordict::Dict{T, Vector{T}}) where {T, U, V}
+    function PreGraph(
+            vertices::Vector{T}, segments::Vector{Segment{T, U}},
+            metavertexdict::Dict{T, MetaVertex{T, V}}, neighbordict::Dict{T, Vector{T}}
+        ) where {T, U, V}
 
         normalvertices = [v for v in vertices if !isspecial(v)]
         specialvertices = [v for v in vertices if isspecial(v)]
@@ -78,7 +82,7 @@ function PreGraph(_vertices::Vector{T}, _segments::Vector{Segment{T, U}}, _metav
         v2_nbs = get(neighbordict, v2, T[])
         v2 in v1_nbs || (neighbordict[v1] = [v1_nbs; v2])
         v1 in v2_nbs || (neighbordict[v2] = [v2_nbs; v1])
-    end 
+    end
     return PreGraph(_vertices, _segments, _metavertexdict, neighbordict)
 end
 

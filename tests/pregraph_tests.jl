@@ -16,9 +16,9 @@ edge_data_dict = Dict(
 
 pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
 
-issetequal(vertices(pg), [-3:-1; 1:(length(vertices(pg))-3)])
+issetequal(vertices(pg), [-3:-1; 1:(length(vertices(pg)) - 3)])
 length(segments(pg, 1)) == 4
-length(segments(pg)) == 3*3 + 2
+length(segments(pg)) == 3 * 3 + 2
 length(getmetavertices(pg)) == 6
 length([mv for mv in getmetavertices(pg) if isspecial(mv)]) == 3
 issetequal(neighbors(pg, 1), [-1, -2, -3, 2])
@@ -33,19 +33,23 @@ pg = PreGraph(
         Segment(6, [2, 3], 1.0, false);
         Segment(7, [2, 4], 1.0, false);
     ],
-    Dict([
-        -1 => MetaVertex(-1, :appearance),
-        [i => MetaVertex(i, [:a, :b, :c, :d][i], float(i), float(i)) for i in 1:4]...
-    ])
+    Dict(
+        [
+            -1 => MetaVertex(-1, :appearance),
+            [i => MetaVertex(i, [:a, :b, :c, :d][i], float(i), float(i)) for i in 1:4]...,
+        ]
+    )
 )
 
 issetequal(
     pg.neighbordict,
-    Dict([
-        -1 => [1, 2, 3, 4],
-        1 => [-1, 2],
-        2 => [-1, 1, 3, 4],
-        3 => [-1, 2],
-        4 => [-1, 2]
-    ])
+    Dict(
+        [
+            -1 => [1, 2, 3, 4],
+            1 => [-1, 2],
+            2 => [-1, 1, 3, 4],
+            3 => [-1, 2],
+            4 => [-1, 2],
+        ]
+    )
 )

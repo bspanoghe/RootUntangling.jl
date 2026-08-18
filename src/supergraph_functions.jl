@@ -29,7 +29,7 @@ polarity(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id
 
 # angles
 angle(hv1::HyperVertex{T, U}, hv2::HyperVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
-    reverse_order ? atan(y(hv1) - y(hv2), x(hv1) - x(hv2)) :  atan(y(hv2) - y(hv1), x(hv2) - x(hv1))
+    reverse_order ? atan(y(hv1) - y(hv2), x(hv1) - x(hv2)) : atan(y(hv2) - y(hv1), x(hv2) - x(hv1))
 )
 angle(sg::SuperGraph{T, U}, se::SingularEdge{T, U}; reverse_order::Bool = false) where {T, U} = (
     vertices(se) .|> (v -> getsingularvertex(sg, v)) .|> hypervertex |> hvs -> angle(hvs...; reverse_order)
@@ -39,10 +39,10 @@ angle(sg::SuperGraph{T, U}, he::HyperEdge{T, U}; reverse_order::Bool = false) wh
 )
 
 cosine_similarity(sg::SuperGraph{T, U}, ae1::AbstractEdge{T}, ae2::AbstractEdge{T}, v::T) where {T, U} = (
-    cos( -((angle(sg, e, reverse_order = (v == vertices(e)[1])) for e in [ae1, ae2])...) ) # ensure angle of edge is calculated according to same common vertex as starting point
+    cos(-((angle(sg, e, reverse_order = (v == vertices(e)[1])) for e in [ae1, ae2])...)) # ensure angle of edge is calculated according to same common vertex as starting point
 )
 cosine_similarity(sg::SuperGraph{T, U}, ae::AbstractEdge{T}, α; reverse_order::Bool = false) where {T, U} = (
-    cos( angle(sg, ae; reverse_order) - α )
+    cos(angle(sg, ae; reverse_order) - α)
 )
 
 angle_dissimilarity(sg::SuperGraph{T, U}, ae1::AbstractEdge{T}, ae2::AbstractEdge{T}, v::T) where {T, U} = (

@@ -11,7 +11,7 @@ function greedy_switch(sg, model, roots; max_tries = 100)
         overlap_dict = find_overlaps(sg, model, roots_copy)
         switch_dict = get_switch_dict(overlap_dict, roots_copy)
         n = maximum(keys(switch_dict))
-        
+
         torts = [total_tortuosity(sg, roots_copy, create_switches(n, i), switch_dict) for i in 1:n]
         best_idx = argmin(torts)
         if torts[best_idx] < current_tort
@@ -33,21 +33,21 @@ function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     # discarding roots of length 2 or smaller (switching does nothing)
     overlap_dict = [
         he => [r for r in roots if !any([isdisjoint(vs, vertices(r)) for vs in V(sg, he)]) && length(r) > 2]
-        for he in overlap_hes
+            for he in overlap_hes
     ] |> Dict
 
     # if you have multiple edges in a connected linear path, each with the same amount of roots, only choose one edge from that path
     # reasoning: switching roots on multiple of these consecutive edges has no added effect over switching them on just one
     overlap_hes_subset = [
         get_linear_chains(filter(he -> length(overlap_dict[he]) == n, overlap_hes))
-        for n in unique(length.(values(overlap_dict)))
+            for n in unique(length.(values(overlap_dict)))
     ] |> x -> reduce(vcat, x) .|> first
 
     overlap_dict_subset = [
         he => [r for r in roots if !any([isdisjoint(vs, vertices(r)) for vs in V(sg, he)])]
-        for he in overlap_hes_subset
+            for he in overlap_hes_subset
     ] |> Dict
-    
+
     return overlap_dict_subset
 end
 
@@ -101,7 +101,7 @@ function total_tortuosity(sg, roots, switches, switch_dict)
     return tortuosity(roots_copy)
 end
 
-create_switches(n::Integer, i::Integer) = [zeros(Bool, i-1); true; zeros(Bool, n-i)]
+create_switches(n::Integer, i::Integer) = [zeros(Bool, i - 1); true; zeros(Bool, n - i)]
 
 function make_switches!(sg, roots, switches, switch_dict)
     for switch in findall(switches)
@@ -122,15 +122,15 @@ function switch!(sg::SuperGraph, he::HyperEdge, r1::Root, r2::Root)
     src_idx2 = findfirst(v -> v in vs_he_src, vertices(r2))
 
     # find vertices in roots that match destination of hyperedge (only need to look at vertices neighbouring source idx)
-    dst_idx1 = get(vertices(r1), src_idx1-1, 0) in vs_he_dst ? src_idx1-1 : src_idx1+1
-    dst_idx2 = get(vertices(r2), src_idx2-1, 0) in vs_he_dst ? src_idx2-1 : src_idx2+1
+    dst_idx1 = get(vertices(r1), src_idx1 - 1, 0) in vs_he_dst ? src_idx1 - 1 : src_idx1 + 1
+    dst_idx2 = get(vertices(r2), src_idx2 - 1, 0) in vs_he_dst ? src_idx2 - 1 : src_idx2 + 1
 
     # skip switching if hyperedge is at an extremity of either root (switching does nothing)
     if any([idx in [1, length(r1)] for idx in [src_idx1, dst_idx1]]) || any([idx in [1, length(r2)] for idx in [src_idx2, dst_idx2]])
         @debug("`switch!` skipped")
         return nothing
     end
-    
+
     # check if root orientations match
     orientation_match = (dst_idx1 - src_idx1) == (dst_idx2 - src_idx2)
 
@@ -140,9 +140,8 @@ function switch!(sg::SuperGraph, he::HyperEdge, r1::Root, r2::Root)
         splice!(r2.V, dst_idx2:length(V(r2)), tail1)
     else
         tail1 = splice!(r1.V, dst_idx1:length(r1), reverse(r2.V[1:dst_idx2]))
-        splice!(r2.V, 1:dst_idx2, reverse(tail1))        
+        splice!(r2.V, 1:dst_idx2, reverse(tail1))
     end
 
     return nothing
 end
-
