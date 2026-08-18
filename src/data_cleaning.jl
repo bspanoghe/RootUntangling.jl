@@ -21,13 +21,12 @@ end
 
 # ## segment information
 
-function get_edge_info(datadict::Dict; dist_colname::Symbol, fake_colname::Symbol,
+function get_edge_info(datadict::Dict; dist_colname::Symbol,
     primary_score_colname::Symbol, coords_colname::Symbol, y_transform::Function)
 
     edge_data_dict = [
         entry[1] => Dict([
             :width => entry[2][dist_colname],
-            :fake => entry[2][fake_colname],
             :pred_primary => (
                 get(entry[2], primary_score_colname, missing) |> x -> isequal(x, "") ? missing : x
             ), #! only for testing first 7 ROI - remove default `missing` later

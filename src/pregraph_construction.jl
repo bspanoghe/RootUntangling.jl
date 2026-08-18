@@ -44,7 +44,7 @@ function getsegments(metavertices::Vector{MetaVertex{T, U}}, vertex_data_dict, e
     end
 
     segments = [
-        Segment(id, vertices, [edge_data_dict[id][col] for col in [:width, :fake, :pred_primary, :xs, :ys]]...)
+        Segment(id, vertices, [edge_data_dict[id][col] for col in [:width, :pred_primary, :xs, :ys]]...)
         for (id, vertices) in segment_connections
     ]
 
@@ -86,7 +86,7 @@ function differentiate_duplicates!(metavertices::Vector{MetaVertex{T, U}},
         Segment{T, V}(
             seg_id_max + i,
             [vertices(duplicates[i])[1], id(mv_new[i])],
-            [f(duplicates[i]) for f in [width, is_fake, pred_primary, xs, ys]]...
+            [f(duplicates[i]) for f in [width, pred_primary, xs, ys]]...
         )
         for i in eachindex(duplicates)
     ]
@@ -316,19 +316,22 @@ end
 
 # # method for doing all steps from file reading
 function get_pregraph(filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, flip_y::Bool
+        dist_threshold::Real, reverse_y::Bool, node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
+        x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
+        segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
+        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords
     )
 
-    vertex_data = read_data(filename_vertices, :Node)
-    ymax = [vertex_datum[:Coord_y] for vertex_datum in values(vertex_data)] |> maximum
-    y_transform = flip_y ? y -> ymax .- y : identity
-    vertex_data_dict = get_vertex_info(vertex_data; segment_ids_colname = :Segment_IDs, x_colname = :Coord_x,
-        y_colname = :Coord_y, lateral_score_colname = :Lateral_Score, y_transform
+    vertex_data = read_data(filename_vertices, node_id_colname)
+    ymax = [vertex_datum[y_colname] for vertex_datum in values(vertex_data)] |> maximum
+    y_transform = reverse_y ? y -> ymax .- y : identity
+    vertex_data_dict = get_vertex_info(vertex_data; segment_ids_colname, x_colname,
+        y_colname, lateral_score_colname, y_transform
     )
 
-    edge_data = read_data(filename_segments, :Segment_ID)
-    edge_data_dict = get_edge_info(edge_data; dist_colname = :Mean_Distance, fake_colname = :Fake_Lateral,
-        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords, y_transform
+    edge_data = read_data(filename_segments, segment_id_colname)
+    edge_data_dict = get_edge_info(edge_data; dist_colname,
+        primary_score_colname, coords_colname, y_transform
     )
 
     pg = get_pregraph(edge_data_dict, vertex_data_dict; dist_threshold)

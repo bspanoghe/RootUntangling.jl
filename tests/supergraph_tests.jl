@@ -42,7 +42,7 @@ issetequal(
 )
 
 # gethypervertex 
-id(gethypervertex(1, Vₕ₀(sg))) == 1
+id(gethypervertex(Vₕ₀(sg), 1)) == 1
 
 # # singular vertices
 

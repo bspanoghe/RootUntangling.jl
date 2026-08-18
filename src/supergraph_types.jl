@@ -15,7 +15,7 @@ Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.n
 """
     HyperEdge{T, U}
 
-Represents an edge in between two hypervertices.
+Represents a segment from a root scan, which may contain one or multiple roots.
 """
 struct HyperEdge{T, U} <: AbstractEdge{T}
     src::T
@@ -80,14 +80,8 @@ y(hv::HyperVertex) = hv.y
 pred_split(hv::HyperVertex) = hv.pred_split
 vertices(hv::HyperVertex) = hv.vertices
 
-gethypervertex(v::T, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = Vₕ[findfirst(hv -> id(hv) == v, Vₕ)]
-neighbor(hv::HyperVertex{T, U}, he::HyperEdge{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = (
-    vertices(he)[findfirst(v -> v != id(hv), vertices(he))] |> (v -> gethypervertex(v, Vₕ))
-)
-is_augmented(hv::HyperVertex) = any(is_augmented.(vertices(hv)))
-
 coords(hv::HyperVertex) = (x(hv), y(hv))
-
+is_augmented(hv::HyperVertex) = any(is_augmented.(vertices(hv)))
 
 """
     SingularVertex{T, U}
@@ -112,6 +106,14 @@ y(sv::SingularVertex) = y(hypervertex(sv))
 coords(sv::SingularVertex) = coords(hypervertex(sv))
 
 # graphs
+"""
+    SuperGraph{T, U}
+
+Represents one or more root systems.
+
+The (singular) edges E represent the possible presence of a single root, 
+while hyperedges Eₕ are groups of edges at the same position, representing a segment in the scan which may contain multiple roots.
+"""
 struct SuperGraph{T, U}
     Vₕ₀::Vector{HyperVertex{T, U}}
     Vₕ₊::Vector{HyperVertex{T, U}}
@@ -161,6 +163,8 @@ V(sg::SuperGraph) = [V₊(sg); V₀(sg)]
 Eₕ(sg::SuperGraph) = [Eₕ₊(sg); Eₕ₀(sg)]
 E(sg::SuperGraph) = [E₊(sg); E₀(sg)]
 
+Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
+
 E₂(sv::SingularVertex) = [
     [edges(sv)[i], edges(sv)[j]] 
     for i in eachindex(edges(sv)) for j in eachindex(edges(sv))
@@ -169,29 +173,12 @@ E₂(sv::SingularVertex) = [
 E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[])
 E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]
 
-getsingularvertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(sg)[v] : V₊(sg)[-v]
-gethypervertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? Vₕ₀(sg)[v] : Vₕ₊(sg)[-v]
-width(sg::SuperGraph, se::SingularEdge) = width(hyperedge(se)) / minimum(order.(getsingularvertex.([sg], vertices(se))))
-
-neighbor(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}, se::SingularEdge{T}) where {T, U} = (
-    vertices(se)[findfirst(v -> v != id(sv), vertices(se))] |> v -> getsingularvertex(sg, v)
-)
-neighbor(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}, he::HyperEdge{T}) where {T, U} = (
-    vertices(he)[findfirst(v -> v != id(hv), vertices(he))] |> v -> gethypervertex(sg, v)
-)
-neighbors(sg::SuperGraph{T, U}, av::AbstractVertex{T, U}) where {T, U} = [neighbor(sg, av, ae) for ae in edges(av)]
-
-inner_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) > 1]
-outer_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) == 1]
-
-Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
-
-# some additional methods to make model definition look nicer
+# additional methods using mathematical syntax of V / V₀ / Vₕ / Vₕ₀ and E / E₀ / Eₕ / Eₕ₀
 V(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
-V(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = [vertices(gethypervertex(v, Vₕ(sg))) for v in vertices(he)]
+V(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = [vertices(gethypervertex(Vₕ(sg), v)) for v in vertices(he)]
 V(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(hv)]
 Vₕ(sv::SingularVertex) = hypervertex(sv)
-Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(v, Vₕ(sg)) for v in [src(he), dst(he)]]
+Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(Vₕ(sg), v) for v in [src(he), dst(he)]]
 
 E(av::AbstractVertex) = edges(av)
 E(avs::Vector{<:AbstractVertex}) = reduce(vcat, E.(avs), init = eltype(avs)[])

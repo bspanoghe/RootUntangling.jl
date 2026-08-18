@@ -1,3 +1,45 @@
+"""
+    get_supergraph(filename_segments::String, filename_vertices::String;
+        dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1, [colnames...]
+    )
+
+Create a supergraph from two files containing segment and vertex information.
+
+# General keyword arguments
+- `dist_threshold::Real`: The distance below which branchpoints are considered to be the same and will be merged.
+- `reverse_y::Bool`: Reverse the y-coordinates? Use this to ensure the root system is oriented with the highest y-values at the top (affects results of solving).
+- `pₛ::Real`: The quantile of all widths in the graph to use as the width of a single root.
+- `nₕ_min::Integer`: The minimum amount of roots possibly present in each edge of the graph.
+# Column names
+For the file containing vertex/node information
+- `node_id_colname`: ID.
+- `segment_ids_colname`: IDs of the connected segments.
+- `x_colname`: x-coordinate.
+- `y_colname`: y-coordinate.
+- `lateral_score_colname`: NN-predicted probability of a lateral root dividing at this node.
+
+For the file containing edge/segment information.
+- `segment_id_colname`: ID.
+- `dist_colname`: Estimated width of segment.
+- `primary_score_colname`: NN-predicted probability of the segment containing a primary root.
+- `coords_colname`: The y and x coordinates of each pixel of the segment.
+"""
+function get_supergraph(filename_segments::String, filename_vertices::String;
+        dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1,
+        node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
+        x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
+        segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
+        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords
+    )
+    
+    pg = get_pregraph(filename_segments, filename_vertices; dist_threshold, reverse_y, node_id_colname,
+        segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
+        dist_colname, primary_score_colname, coords_colname)
+    sg = get_supergraph(pg; pₛ, nₕ_min)
+
+    return sg
+end
+
 function get_supergraph(pg::PreGraph; pₛ, nₕ_min)
     nₕs = [get_num_hypotheses(pg, mv; pₛ, nₕ_min) for mv in getmetavertices(pg) if !isspecial(mv)]
 
@@ -67,15 +109,4 @@ function getsingularvertices(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, 
         )
         for v in vertices(hv)
     ]
-end
-
-# method for doing all steps from file reading
-function get_supergraph(filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, flip_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1
-    )
-    
-    pg = get_pregraph(filename_segments, filename_vertices; dist_threshold, flip_y)
-    sg = get_supergraph(pg; pₛ, nₕ_min)
-
-    return sg
 end

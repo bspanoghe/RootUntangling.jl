@@ -165,7 +165,11 @@ end
 # Root plotting
 function Plots.plot(r::Root; kwargs...)
     linestyle = is_primary(r) ? :solid : :dot
-    plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
+    plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 2, kwargs...)
+end
+function Plots.plot!(r::Root; kwargs...)
+    linestyle = is_primary(r) ? :solid : :dot
+    plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 2, kwargs...)
 end
 
 function Plots.plot(rs::Vector{<:Root}; kwargs...)
@@ -173,35 +177,47 @@ function Plots.plot(rs::Vector{<:Root}; kwargs...)
     for (i, r) in enumerate(rs)
         linestyle = is_primary(r) ? :solid : :dot
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
-        plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 1, kwargs...)
+        plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 2, kwargs...)
     end
     plot!(aspect_ratio = :equal; kwargs...)
 end
-
-function Plots.plot!(r::Root; kwargs...)
-    linestyle = is_primary(r) ? :solid : :dot
-    plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
-end
-
 function Plots.plot!(rs::Vector{<:Root}; kwargs...)
     for (i, r) in enumerate(rs)
         linestyle = is_primary(r) ? :solid : :dot
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
-        plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 1, kwargs...)
+        plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 2, kwargs...)
     end
 end
 
+function Plots.plot(rss::Vector{<:Vector{<:Root}}; kwargs...)
+    plot()
+    for rs in rss
+        plot!(rs; kwargs...)
+    end
+    plot!(aspect_ratio = :equal; kwargs...)
+end
+function Plots.plot!(rss::Vector{<:Vector{<:Root}}; kwargs...)
+    for rs in rss
+        plot!(rs; kwargs...)
+    end
+end
 
 # custom plots
-function hypothesis_plot(sg::SuperGraph; ΔH = 80)
+"""
+    hypothesis_plot(sg::SuperGraph)
+
+Visualise the maximum allowed number of roots per segment of a graph.
+"""
+function hypothesis_plot(sg::SuperGraph)
     nₕs = [
-        maximum([length(vertices(hv)) for hv in gethypervertex.(vertices(he), [Vₕ(sg)])])
+        maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
         for he in Eₕ(sg)
     ]
     nₕ₀s = [
-        maximum([length(vertices(hv)) for hv in gethypervertex.(vertices(he), [Vₕ(sg)])])
+        maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
         for he in Eₕ₀(sg)
     ]
+    ΔH = 360 / (maximum(nₕs) + 1)
 
     plot(sg, size = (600, 800), label = false, edge_kwargs = 
         Dict(

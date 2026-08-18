@@ -1,5 +1,30 @@
-function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = missing, hotstart_time = 0,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ϵ = 1e-2, α_down = -pi/2
+"""
+    solve_rsa(
+        sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.95, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi/2, ϵ = 1e-5
+    )
+
+Solve which root system architecture is represented by the graph `sg`.
+
+The problem is formulated as a Integer Quadratic Program (IQP) written to allow Integer Linear Program (ILP) solvers.
+
+# General keyword arguments
+- `optimizer`: The JuMP.jl-compatible ILP optimizer to use.
+- `add_momentum`: Minimize angle differences between successive pieces of a root?
+- `time_limit`: Time limit of the solver in seconds.
+- `hotstart_time`: Time limit of hotstart in seconds. Setting to 0 will disable hotstarting.
+- `num_roots`: The amount of root systems present in the graph.
+# Solver parameters
+- `ρₐ`: The probability of a root appearing without division from the main root.
+- `ρₕ`: The probability that an edge truly contains at least one root.
+- `ρₘ_max`: The weight given to angle differences, defined as the maximum probability that two succesive edges are the same root if there is no change in angle betweem them.
+- `ρₙₙ_max`: The weight given to neural network classfications, defined as the maximum probability that a root is a primary root if classified as such by the neural network.
+- `ρᵧ_max`: The weight given to gravitropy, defined as the maximum probability that a downward edge is a root.
+- `α_down`: The angle pointing down.
+- `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
+"""
+function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi/2, ϵ = 1e-5
     )
 
     # check for NN prediction data #! remove for final version
@@ -81,14 +106,7 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool, time_limit = m
                 hep2f[he] * log(ρₙₙ(he; ρₙₙ_max, ϵ) / (1 - ρₙₙ(he; ρₙₙ_max, ϵ)))
                 for he in Eₕ₀(sg)
             )
-        ) # +
-        # similar predicted thickness
-        # (
-        #     !add_momentum ? 0 : sum(
-        #     c2f[c] * log(ρₜ(sg, c; ρₜ_max, ϵ) / (1 - ρₜ(sg, c; ρₜ_max, ϵ)))
-        #     for c in E₂(sg) if !any([is_augmented(e) for e in c])
-        #     )
-        # )
+        )
     )
     
     # # define constraints
