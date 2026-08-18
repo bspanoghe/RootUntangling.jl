@@ -12,17 +12,17 @@ Create a supergraph from two files containing segment and vertex information.
 - `nₕ_min::Integer`: The minimum amount of roots possibly present in each edge of the graph.
 # Column names
 For the file containing vertex/node information
-- node_id_colname: ID.
-- segment_ids_colname: IDs of the connected segments.
-- x_colname: x-coordinate.
-- y_colname: y-coordinate.
-- lateral_score_colname: NN-predicted probability of a lateral root dividing at this node.
+- `node_id_colname`: ID.
+- `segment_ids_colname`: IDs of the connected segments.
+- `x_colname`: x-coordinate.
+- `y_colname`: y-coordinate.
+- `lateral_score_colname`: NN-predicted probability of a lateral root dividing at this node.
 
 For the file containing edge/segment information.
-- segment_id_colname: ID.
-- dist_colname: Estimated width of segment.
-- primary_score_colname: NN-predicted probability of the segment containing a primary root.
-- coords_colname: The y and x coordinates of each pixel of the segment.
+- `segment_id_colname`: ID.
+- `dist_colname`: Estimated width of segment.
+- `primary_score_colname`: NN-predicted probability of the segment containing a primary root.
+- `coords_colname`: The y and x coordinates of each pixel of the segment.
 """
 function get_supergraph(filename_segments::String, filename_vertices::String;
         dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1,

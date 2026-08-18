@@ -18,15 +18,16 @@ using JuMP, Statistics, Plots
 
 include("data_reading.jl"); # read in data to dictionaries
 include("data_cleaning.jl"); # clean dictionaries to expected format for vertex and edge info
-include("pregraph_types.jl"); # data types for preliminary graph - mirrors information from data quite directly
+include("pregraph_types.jl"); # data types for preliminary graph (segments from scan not yet divided into multiple possible roots)
 include("pregraph_construction.jl"); # construct preliminary graph from data
-include("supergraph_types.jl"); # data types for supergraph - made specifically for solving of the problem
-include("supergraph_functions.jl"); # functions that calculate
+include("supergraph_types.jl"); # data types for supergraph
+include("supergraph_functions.jl"); # supergraph functions needed for the model
 include("supergraph_construction.jl"); # construct supergraph from preliminary graph
 include("supergraph_clustering.jl"); # cluster disconnected graphs in a supergraph
 include("solving.jl"); # solve problem based on supergraph
-include("result_extraction.jl") # get classifications from model
-include("root_types.jl") # get resulting roots
+include("classification_extraction.jl") # get classifications from model
+include("root_types.jl") # type to represent resulting roots
+include("root_construction.jl") # get the roots
 include("root_postprocessing.jl") # postprocessing on roots
 include("plotting.jl"); # visualisation
 

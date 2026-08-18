@@ -8,7 +8,7 @@ using Dates
 ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-roi_nr = 14
+roi_nr = 12
 
 # read data
 
@@ -27,20 +27,22 @@ begin
     hypothesis_plot(sg)
 end
 
-model, time =  @timed RootUntangling.solve_rsa(
+model, time =  @timed solve_rsa(
     sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 10*60, hotstart_time = 2*60, 
     num_roots = 2, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5
 )
 
 roots = get_roots(sg, model);
 plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min")
+examine(roots)
+
 savefig(homedir() * "/Downloads/test.svg")
 savefig("results/roi$(roi_nr)_roots_$(today).svg")
 
 # multi
 
 sgs = get_subgraphs(sg; pₛ, nₕ_min) |> 
-    sgs -> filter(x -> length(x) > 50, sgs);
+    sgs -> filter(x -> length(x) > 20, sgs);
 
 begin
     plot(legend = false)
@@ -50,12 +52,12 @@ begin
     plot!()
 end
 
-subidx = 2
+subidx = 1
 
 plot(sgs[subidx], size = (1000, 800))
 hypothesis_plot(sgs[subidx])
 
-model, time = @timed RootUntangling.solve_rsa(
+model, time = @timed solve_rsa(
     sgs[subidx]; optimizer = Gurobi.Optimizer, time_limit = 13*60, hotstart_time = 2*60,
     num_roots = 1
 )
