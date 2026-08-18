@@ -33,6 +33,14 @@ function get_hv_classification_dict(sg::SuperGraph, model::JuMP.Model)
     return hv_classification_dict
 end
 
+function get_polarity_classification_dict(sg::SuperGraph, model::JuMP.Model)
+    e₊ = [var for var in all_variables(model) if !isnothing(match(r"^e₊\[\d+\]$", JuMP.name(var)))]
+    
+    polarity_classification_dict = [E(sg)[i] => round(Bool, value(e₊[i])) for i in eachindex(E(sg))] |> Dict
+
+    return polarity_classification_dict
+end
+
 # multiple graphs
 
 function get_se_classification_dict(sgs::Vector{SuperGraph{T, U}}, models::Vector{<:JuMP.Model}; kwargs...) where {T, U}
