@@ -10,6 +10,7 @@ Base.unique(aes::Vector{<:AbstractEdge}) = unique(x -> vertices(x), aes) # doesn
 Base.unique!(aes::Vector{<:AbstractEdge}) = unique!(x -> vertices(x), aes) # sad times
 
 Base.show(io::IO, ae::AbstractEdge) = print(io, "$(typeof(ae).name.name)$(vertices(ae))")
+Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.name)$(vertices.(aes))")
 
 """
     HyperEdge{T, U}
@@ -54,6 +55,7 @@ edges(av::AbstractVertex) = av.edges
 edges(avs::Vector{<:AbstractVertex}) = reduce(vcat, edges.(avs), init = eltype(avs)[])
 
 Base.show(io::IO, av::AbstractVertex) = print(io, "$(typeof(av).name.name)$( (id(av), edges(av)) )")
+Base.show(io::IO, avs::Vector{<:AbstractVertex}) = print(io, "$(typeof(avs).name.name)$( id.(avs) )")
 
 """
     HyperVertex{T, U}
@@ -186,8 +188,10 @@ Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
 
 # some additional methods to make model definition look nicer
 V(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
+V(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = [vertices(gethypervertex(v, Vₕ(sg))) for v in vertices(he)]
 V(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(hv)]
 Vₕ(sv::SingularVertex) = hypervertex(sv)
+Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(v, Vₕ(sg)) for v in [src(he), dst(he)]]
 
 E(av::AbstractVertex) = edges(av)
 E(avs::Vector{<:AbstractVertex}) = reduce(vcat, E.(avs), init = eltype(avs)[])

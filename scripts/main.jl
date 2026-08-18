@@ -4,16 +4,18 @@ using Pkg; Pkg.activate("./scripts")
 using RootUntangling, RootUntangling.Plots
 using JuMP
 using HiGHS, Gurobi
-
+using Metaheuristics
 using Dates
-today = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0"*x : x) |> x -> x[1] * "-" * x[2]
+ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-roi_nr = 5
+roi_nr = 1
 
 # read data
 
 begin
+    today = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0"*x : x) |> x -> x[1] * "-" * x[2]
+
     nₕ_min = 1
     pₛ = 0.2
     dist_threshold = 3
@@ -26,10 +28,8 @@ begin
     hypothesis_plot(sg)
 end
 
-histogram(length.(vertices.(Vₕ₀(sg))))
-
 model, time =  @timed RootUntangling.solve_rsa(
-    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 13*60, hotstart_time = 2*60, 
+    sg; optimizer = HiGHS.Optimizer, add_momentum = true, time_limit = 10*60, hotstart_time = 2*60, 
     num_roots = 1, ρₐ = 0.01, ρₕ = 0.9
 )
 
@@ -40,8 +40,8 @@ savefig("results/roi$(roi_nr)_roots_$(today).svg")
 
 # multi
 
-sgs = get_subgraphs(sg; pₛ, nₕ_min);
-sgs = filter(x -> length(x) > 50, sgs);
+sgs = get_subgraphs(sg; pₛ, nₕ_min) |> 
+    sgs -> filter(x -> length(x) > 20, sgs);
 
 begin
     plot(legend = false)
@@ -51,18 +51,18 @@ begin
     plot!()
 end
 
-subidx = 2
+subidx = 1
+
 plot(sgs[subidx], size = (1000, 800))
-savefig(homedir() * "\\Downloads\\wa.svg")
 hypothesis_plot(sgs[subidx])
 
 model, time = @timed RootUntangling.solve_rsa(
     sgs[subidx]; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 13*60, hotstart_time = 2*60,
-    num_roots = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.9
+    num_roots = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.75
 )
 
-plot(sgs[subidx], get_he_classification_dict(sgs[subidx], model), size = (800, 800))
-savefig("results/roi$(roi_nr)-$(subidx)_classification_$(today).svg")
+# plot(sgs[subidx], get_he_classification_dict(sgs[subidx], model), size = (800, 800))
+# savefig("results/roi$(roi_nr)-$(subidx)_classification_$(today).svg")
 
 roots = get_roots(sgs[subidx], model)
 plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min", lw = 1)
@@ -79,6 +79,7 @@ savefig(homedir() * "\\Downloads\\wa.svg")
 
 # testing grounds
 
+## tort tests
 i = 1
 begin
     r = roots[i]
@@ -86,21 +87,29 @@ begin
     plot(r, title = "$(RootUntangling.tortuosity(r))")
 end
 
-he_classification_dict = RootUntangling.get_he_classification_dict(sg, model)
-se_classification_dict = RootUntangling.get_se_classification_dict(sg, model)
-
-edge_groups = [
-    [
-        se
-        for se in E(sg, he)
-        if abs(se_classification_dict[se]) > 0
-    ] 
-    for he in Eₕ₀(sg)
-] |> v -> filter(x -> length(x) >= 2, v)
-
+## does switching work
 begin
-    rr = roots[3]
-    plot(roots, label = nothing)
-    plot!(sg, reduce(vcat, edge_groups), color = :pink, lw = 5, alpha = 0.3, label = nothing)
-    annotate!([(xs(rr)[i], ys(rr)[i], "$i", 6) for i in eachindex(xs(rr))])
+    roots = get_roots(sg, model)
+    overlap_dict = find_overlaps(sg, model, roots)
+    overlap_edges = collect(keys(overlap_dict))
+    he = overlap_edges[1]
+    r1 = overlap_dict[he][1]
+    r2 = overlap_dict[he][2]
+
+    p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
+    plot!(sg, he, color = :red, linestyle = :solid, lw = 5, alpha = 0.3)
+    RootUntangling.switch!(sg, he, r1, r2)
+    p_after = plot(roots, title = "Total tort: $(tortuosity(roots))")
+    plot!(sg, he, color = :red, linestyle = :solid, lw = 5, alpha = 0.3, label = false)
+    plot(p_before, p_after)
+end
+
+## does greedy search work
+begin
+    roots = get_roots(sg, model)
+    roots_improved = greedy_switch(sg, model, roots)
+
+    p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
+    p_after = plot(roots_improved, title = "Total tort: $(tortuosity(roots_improved))")
+    plot(p_before, p_after)
 end

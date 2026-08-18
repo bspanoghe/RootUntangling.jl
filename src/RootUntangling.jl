@@ -9,8 +9,9 @@ export id, edges, x, y, pred_split, xs, ys, hypervertex, exclusion_sets # vertic
 export Vₕ₀, Vₕ₊, V₀, V₊, Vₕ, V, Eₕ₀, Eₕ₊, E₀, E₊, Eₕ, E, E₂, neighbors # graphs
 export get_subgraphs # separate graphs
 export solve_rsa, solve_rsa_simple, solve_rsa_fulloption # solving
-export get_he_classification_dict, get_se_classification_dict, get_roots # get results
-export hypothesis_plot
+export get_he_classification_dict, get_se_classification_dict, get_hv_classification_dict, get_sv_classification_dict # get results
+export get_roots, greedy_switch, tortuosity # get and postprocess roots
+export hypothesis_plot # fancy plotting
 
 using JuMP, Statistics, Plots
 
@@ -23,8 +24,9 @@ include("supergraph_functions.jl"); # functions that calculate
 include("supergraph_construction.jl"); # construct supergraph from preliminary graph
 include("supergraph_clustering.jl"); # cluster disconnected graphs in a supergraph
 include("solving.jl"); # solve problem based on supergraph
-include("root_extraction.jl") # get roots from model
-include("root_postprocessing.jl") # postprocessing
+include("result_extraction.jl") # get classifications from model
+include("root_types.jl") # get resulting roots
+include("root_postprocessing.jl") # postprocessing on roots
 include("plotting.jl"); # visualisation
 
 end
