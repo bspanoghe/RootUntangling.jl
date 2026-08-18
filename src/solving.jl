@@ -23,13 +23,14 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `α_down`: The angle pointing down.
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
-function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi/2, ϵ = 1e-5
+function solve_rsa(
+        sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi / 2, ϵ = 1.0e-5
     )
 
     # check for NN prediction data #! remove for final version
     NN_pred = pred_primary(Eₕ₀(sg)[1]) |> !ismissing
-    
+
     # name special vertices
     vₐ = V₊(sg)[1]
     vₑ = V₊(sg)[2] # extinction == disappearance
@@ -50,7 +51,7 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_li
     @variable(model, ea[1:n_e], Bin) # is the edge active (part of the root)
     @variable(model, ep[1:n_e], Bin) # is the edge part of the primary root
     @variable(model, e₊[1:n_e], Bin) # is this a positive edge (should it follow the natural polarity of the edge)
-        # note: the natural polarity of an edge is defined as going from the vertex with the lowest id to the one with the highest id
+    # note: the natural polarity of an edge is defined as going from the vertex with the lowest id to the one with the highest id
 
     add_momentum && @variable(model, f[1:n_c], Bin) # are these edges part of the same root
 
@@ -77,38 +78,38 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_li
         # appearance penalties
         sum(
             ea2f[e] * log(ρₐ / (1 - ρₐ))
-            for e in E(vₐ)
+                for e in E(vₐ)
         ) +
-        # standard hyperedges should be active
-        sum(
+            # standard hyperedges should be active
+            sum(
             hea2f[he] * log(ρₕ / (1 - ρₕ))
-            for he in Eₕ₀(sg)
-        ) + 
-        # similar angles
-        (
-            !add_momentum ? 0 : sum(
-            c2f[c] * log(ρₘ(sg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, c; ρₘ_max, ϵ)))
-            for v in V₀(sg) for c in E₂(v) if !any([is_augmented(e) for e in c])
-            )
-        ) +
-        # gravitropy (needs to be split up into two sums to remain a linear objective)
-        sum(
-            e₊2f[e] * log(ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ)))                
-            for e in E₀(sg)
-        ) +
-        sum(
-            (ea2f[e] - e₊2f[e]) * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))                
-            for e in E₀(sg)
-        ) +
-        # NN pred
-        (
-            !NN_pred ? 0 : sum(
-                hep2f[he] * log(ρₙₙ(he; ρₙₙ_max, ϵ) / (1 - ρₙₙ(he; ρₙₙ_max, ϵ)))
                 for he in Eₕ₀(sg)
-            )
+        ) +
+            # similar angles
+            (
+            !add_momentum ? 0 : sum(
+                    c2f[c] * log(ρₘ(sg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, c; ρₘ_max, ϵ)))
+                    for v in V₀(sg) for c in E₂(v) if !any([is_augmented(e) for e in c])
+                )
+        ) +
+            # gravitropy (needs to be split up into two sums to remain a linear objective)
+            sum(
+            e₊2f[e] * log(ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ)))
+                for e in E₀(sg)
+        ) +
+            sum(
+            (ea2f[e] - e₊2f[e]) * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))
+                for e in E₀(sg)
+        ) +
+            # NN pred
+            (
+            !NN_pred ? 0 : sum(
+                    hep2f[he] * log(ρₙₙ(he; ρₙₙ_max, ϵ) / (1 - ρₙₙ(he; ρₙₙ_max, ϵ)))
+                    for he in Eₕ₀(sg)
+                )
         )
     )
-    
+
     # # define constraints
 
     # ## Flow formalism
@@ -118,11 +119,11 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_li
         # It can only be classified as primary if active
         @constraint(model, va2f[v] >= vp2f[v])
         # It is an active vertex ⇔ it is connected to two active edges
-        @constraint(model, 2*va2f[v] == sum(ea2f[e] for e in E(v)))
+        @constraint(model, 2 * va2f[v] == sum(ea2f[e] for e in E(v)))
         # It is an active primary vertex ⇔ it is connected to two active primary edges
-        @constraint(model, 2*vp2f[v] == sum(ep2f[e] for e in E(v)))
+        @constraint(model, 2 * vp2f[v] == sum(ep2f[e] for e in E(v)))
         # It has an incoming and an outgoing edge
-        @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e]))*polarity(e, v) for e in E(v)) == 0)
+        @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e])) * polarity(e, v) for e in E(v)) == 0)
 
         # It is active ⇔ It has one active connection
         add_momentum && @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
@@ -158,10 +159,10 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_li
     @constraint(model, sum(e₊2f[e] for e in E(vₑ)) == 0)
     # The splitting vertex has no incoming edges (edges are either inactive or follow natural polarity)
     @constraint(model, sum((ea2f[e] - e₊2f[e]) for e in E(vₛ)) == 0)
-    
+
     # ## Prerequisite for division
 
-    # A vertex can only split if its hypervertex is part of the primary root 
+    # A vertex can only split if its hypervertex is part of the primary root
     # i.e. lateral root segments can only appear in a hypervertex with an edge classified as a primary root
     for v in inner_vertices(sg) # outer nodes can never split
         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
@@ -206,7 +207,7 @@ function solve_rsa(sg::SuperGraph; optimizer, add_momentum::Bool = true, time_li
             end
         end
     end
-    
+
     # # extra solver options
     ismissing(time_limit) || set_time_limit_sec(model, time_limit)
 
@@ -224,13 +225,13 @@ function solve_rsa(sgs::Vector{SuperGraph{T, U}}; kwargs...) where {T, U}
         @info "Solving graph $i/$(length(sgs))"
         models[i] = solve_rsa(sg; kwargs...)
     end
-    
+
     return models
 end
 
 # # objective function probabilities
 # prevent probabilities from reaching 0 or 1
-bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
+bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # change in angle probability
 ρₘ(sg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(sg, c..., id(v)) |> p -> bound(p; ϵ)
@@ -244,25 +245,13 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 ρₙₙ(he; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(he) |> p -> bound(p; ϵ)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # function solve_rsa_quadratic(sg::SuperGraph; optimizer, time_limit = missing, hotstart_time = 0,
 #         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.9, ρₘ_max = 0.75, ρₙₙ_max = 0.75, ρᵧ_max = 0.5, ϵ = 1e-2, α_down = -pi/2
 #     )
 
 #     # check for NN prediction data #! remove for final version
 #     NN_pred = pred_primary(Eₕ₀(sg)[1]) |> !ismissing
-    
+
 #     # name special vertices
 #     vₐ = V₊(sg)[1]
 #     vₑ = V₊(sg)[2] # extinction == disappearance
@@ -291,7 +280,7 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 #     NN_pred && @variable(model, heₚ[1:n_he], Bin)
 
 #     # connect model variables to graph's edges
-    
+
 #     v2f = Dict([V₀(sg)[i] => v[i] for i in eachindex(V₀(sg))])
 #     vp2f = Dict([V₀(sg)[i] => vₚ[i] for i in eachindex(V₀(sg))])
 #     vl2f = Dict([V₀(sg)[i] => vₗ[i] for i in eachindex(V₀(sg))])
@@ -318,7 +307,7 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 #         sum(
 #             he2f[he] * log(ρₕ / (1 - ρₕ))
 #             for he in Eₕ₀(sg)
-#         ) + 
+#         ) +
 #         # similar angles
 #         sum(
 #             e2f[e1] * e2f[e2] * log(ρₘ(sg, v, [e1, e2]; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, [e1, e2]; ρₘ_max, ϵ)))
@@ -326,11 +315,11 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 #         ) +
 #         # gravitropy (needs to be split up into two sums to remain a linear objective)
 #         sum(
-#             e₊2f[e] * log(ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ)))                
+#             e₊2f[e] * log(ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ)))
 #             for e in E₀(sg)
 #         ) +
 #         sum(
-#             e₋2f[e] * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))                
+#             e₋2f[e] * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))
 #             for e in E₀(sg)
 #         ) +
 #         # NN pred
@@ -341,7 +330,7 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 #             )
 #         )
 #     )
-    
+
 #     # # define constraints
 
 #     # ## Flow formalism
@@ -383,10 +372,10 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 #     @constraint(model, sum(e₊2f[e] for e in E(vₑ)) == 0)
 #     # The splitting vertex has no incoming edges (edges are either inactive or follow natural polarity)
 #     @constraint(model, sum(e₋2f[e] for e in E(vₛ)) == 0)
-    
+
 #     # ## Prerequisite for division
 
-#     # A vertex can only split if its hypervertex is part of the primary root 
+#     # A vertex can only split if its hypervertex is part of the primary root
 #     # i.e. lateral root segments can only appear in a hypervertex with an edge classified as a primary root
 #     for v in inner_vertices(sg) # outer nodes can never split
 #         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
@@ -433,7 +422,7 @@ bound(p; ϵ = 1e-9) = ϵ/2 + (1-ϵ) * p
 #             end
 #         end
 #     end
-    
+
 #     # # extra solver options
 #     ismissing(time_limit) || set_time_limit_sec(model, time_limit)
 

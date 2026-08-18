@@ -38,10 +38,10 @@ function get_subgraphs(sg::SuperGraph; augmented_margins::Real = 0.1, pₛ = 0.2
         recreated_Vₕ₊ = [recreate_Vₕ₊(hv, id_conversion_dict, recreated_Vₕ₀; augmented_margins) for hv in Vₕ₊(sg)]
         subgraph = SuperGraph(
             recreated_Vₕ₀,
-            recreated_Vₕ₊, 
+            recreated_Vₕ₊,
             [
                 getsingularvertices(hv, [recreated_Vₕ₀; recreated_Vₕ₊]) for hv in recreated_Vₕ₀
-            ] |> x -> reduce(vcat, x), 
+            ] |> x -> reduce(vcat, x),
             [
                 getsingularvertices(hv, [recreated_Vₕ₀; recreated_Vₕ₊]) for hv in recreated_Vₕ₊
             ] |> x -> reduce(vcat, x)
@@ -56,10 +56,10 @@ function recreate_Vₕ₀(hv::HyperVertex{T, U}, id_conversion_dict::Dict, nₕs
     id_new = id_conversion_dict[id(hv)]
     hes_new = HyperEdge{T, U}[
         HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., width(he), pred_primary(he))
-        for he in E(hv) if all(haskey.([id_conversion_dict], vertices(he)))
+            for he in E(hv) if all(haskey.([id_conversion_dict], vertices(he)))
     ]
 
-    prev_id = sum(nₕs[1:i-1]) # amount of vertices that have been defined in previous hypervertices
+    prev_id = sum(nₕs[1:(i - 1)]) # amount of vertices that have been defined in previous hypervertices
     vertices_new = collect(prev_id .+ (1:nₕs[i]))
 
     hv_new = HyperVertex(id_new, hes_new, coords(hv)..., pred_split(hv), vertices_new)
@@ -70,7 +70,7 @@ end
 function recreate_Vₕ₊(hv::HyperVertex{T, U}, id_conversion_dict::Dict, recreated_Vₕ₀::Vector{HyperVertex{T, U}}; augmented_margins) where {T, U}
     id_new = id_conversion_dict[id(hv)]
     hes_new = HyperEdge{T, U}[
-            HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., width(he), pred_primary(he))
+        HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., width(he), pred_primary(he))
             for he in E(hv) if all(haskey.([id_conversion_dict], vertices(he)))
     ]
     coords_new = get_augmented_coords(id(hv), recreated_Vₕ₀; augmented_margins)

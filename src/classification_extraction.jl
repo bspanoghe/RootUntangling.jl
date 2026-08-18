@@ -5,7 +5,7 @@ function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
     ea = [var for var in all_variables(model) if !isnothing(match(r"^ea\[\d+\]$", JuMP.name(var)))]
     ep = [var for var in all_variables(model) if !isnothing(match(r"^ep\[\d+\]$", JuMP.name(var)))]
 
-    se_classification_dict = [E(sg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i]))*im for i in eachindex(E(sg))] |> Dict
+    se_classification_dict = [E(sg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i])) * im for i in eachindex(E(sg))] |> Dict
 
     return se_classification_dict
 end
@@ -21,7 +21,7 @@ function get_sv_classification_dict(sg::SuperGraph, model::JuMP.Model)
     va = [var for var in all_variables(model) if !isnothing(match(r"^va\[\d+\]$", JuMP.name(var)))]
     vp = [var for var in all_variables(model) if !isnothing(match(r"^vp\[\d+\]$", JuMP.name(var)))]
 
-    sv_classification_dict = [V₀(sg)[i] => round(Bool, value(vp[i])) + round(Bool, value(va[i]) - value(vp[i]))*im for i in eachindex(V₀(sg))] |> Dict
+    sv_classification_dict = [V₀(sg)[i] => round(Bool, value(vp[i])) + round(Bool, value(va[i]) - value(vp[i])) * im for i in eachindex(V₀(sg))] |> Dict
 
     return sv_classification_dict
 end
@@ -35,7 +35,7 @@ end
 
 function get_polarity_classification_dict(sg::SuperGraph, model::JuMP.Model)
     e₊ = [var for var in all_variables(model) if !isnothing(match(r"^e₊\[\d+\]$", JuMP.name(var)))]
-    
+
     polarity_classification_dict = [E(sg)[i] => round(Bool, value(e₊[i])) for i in eachindex(E(sg))] |> Dict
 
     return polarity_classification_dict
@@ -49,7 +49,7 @@ function get_se_classification_dict(sgs::Vector{SuperGraph{T, U}}, models::Vecto
     for (i, (sg, model)) in enumerate(zip(sgs, models))
         classification_dict[i] = get_se_classification_dict(sg, model)
     end
-    
+
     return classification_dict
 end
 
@@ -59,6 +59,6 @@ function get_he_classification_dict(sgs::Vector{SuperGraph{T, U}}, models::Vecto
     for (i, (sg, model)) in enumerate(zip(sgs, models))
         classification_dict[i] = get_he_classification_dict(sg, model)
     end
-    
+
     return classification_dict
 end

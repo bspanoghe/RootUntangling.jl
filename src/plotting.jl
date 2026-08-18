@@ -69,13 +69,13 @@ Plots.plot!(sg::SuperGraph, he::HyperEdge; kwargs...) = plot!(sg, [he]; kwargs..
 # graph
 function Plots.plot!(sg::SuperGraph; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     plot!(
-        sg, Eₕ(sg); color = :black, 
+        sg, Eₕ(sg); color = :black,
         alpha = [is_augmented(he) ? augmented_alpha : 1.0 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
         edge_kwargs..., kwargs...
     )
 
     annotate && merge!(vertex_kwargs, Dict(:annotation => [(x(hv), y(hv), text("$(id(hv))", 8, :right, :bottom)) for hv in Vₕ(sg)]))
-    plot!(Vₕ(sg); color = :grey, markersize = 2, vertex_kwargs..., kwargs...)
+    return plot!(Vₕ(sg); color = :grey, markersize = 2, vertex_kwargs..., kwargs...)
 end
 
 function Plots.plot(sg::SuperGraph; aspect_ratio = :equal, legend = false, annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
@@ -101,7 +101,7 @@ function Plots.plot!(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <
         :linewidth => [abs(he_classification_dict[he]) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
     )
     classification_vertex_kwargs = Dict(
-        :color => :grey, 
+        :color => :grey,
         :markersize => 2,
     )
 
@@ -121,11 +121,12 @@ function Plots.plot(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <:
     return p
 end
 
-function Plots.plot(sgs::Vector{SuperGraph{T, U}}, he_classification_dict::Dict{Int64, Dict{HyperEdge{T, U}, Complex{Int64}}};
+function Plots.plot(
+        sgs::Vector{SuperGraph{T, U}}, he_classification_dict::Dict{Int64, Dict{HyperEdge{T, U}, Complex{Int64}}};
         annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false,
         vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     ) where {T, U}
-        
+
     p = plot(; aspect_ratio, legend, kwargs...)
     for (i, sg) in enumerate(sgs)
         plot!(sg, he_classification_dict[i]; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
@@ -141,7 +142,7 @@ function Plots.plot!(sg::SuperGraph, se_classification_dict::Dict{<:SingularEdge
         :linewidth => [abs(se_classification_dict[he]) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
     )
     classification_vertex_kwargs = Dict(
-        :color => :grey, 
+        :color => :grey,
         :markersize => 2,
     )
 
@@ -165,11 +166,11 @@ end
 # Root plotting
 function Plots.plot(r::Root; kwargs...)
     linestyle = is_primary(r) ? :solid : :dot
-    plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 2, kwargs...)
+    return plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 2, kwargs...)
 end
 function Plots.plot!(r::Root; kwargs...)
     linestyle = is_primary(r) ? :solid : :dot
-    plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 2, kwargs...)
+    return plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 2, kwargs...)
 end
 
 function Plots.plot(rs::Vector{<:Root}; kwargs...)
@@ -179,7 +180,7 @@ function Plots.plot(rs::Vector{<:Root}; kwargs...)
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
         plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 2, kwargs...)
     end
-    plot!(aspect_ratio = :equal; kwargs...)
+    return plot!(aspect_ratio = :equal; kwargs...)
 end
 function Plots.plot!(rs::Vector{<:Root}; kwargs...)
     for (i, r) in enumerate(rs)
@@ -187,6 +188,7 @@ function Plots.plot!(rs::Vector{<:Root}; kwargs...)
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
         plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 2, kwargs...)
     end
+    return
 end
 
 function Plots.plot(rss::Vector{<:Vector{<:Root}}; kwargs...)
@@ -194,12 +196,13 @@ function Plots.plot(rss::Vector{<:Vector{<:Root}}; kwargs...)
     for rs in rss
         plot!(rs; kwargs...)
     end
-    plot!(aspect_ratio = :equal; kwargs...)
+    return plot!(aspect_ratio = :equal; kwargs...)
 end
 function Plots.plot!(rss::Vector{<:Vector{<:Root}}; kwargs...)
     for rs in rss
         plot!(rs; kwargs...)
     end
+    return
 end
 
 # custom plots
@@ -211,27 +214,29 @@ Visualise the maximum allowed number of roots per segment of a graph.
 function hypothesis_plot(sg::SuperGraph)
     nₕs = [
         maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
-        for he in Eₕ(sg)
+            for he in Eₕ(sg)
     ]
     nₕ₀s = [
         maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
-        for he in Eₕ₀(sg)
+            for he in Eₕ₀(sg)
     ]
     ΔH = 360 / (maximum(nₕs) + 1)
 
-    plot(sg, size = (600, 800), label = false, edge_kwargs = 
-        Dict(
-            :linewidth => [width(he)/2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
-            :linecolor => [HSV(ΔH*nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
+    plot(
+        sg, size = (600, 800), label = false, edge_kwargs =
+            Dict(
+            :linewidth => [width(he) / 2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
+            :linecolor => [HSV(ΔH * nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
         ),
     )
     plot!(
-        fill(missing, 1, length(unique(nₕs))), fill(missing, 1, length(unique(nₕs))), 
+        fill(missing, 1, length(unique(nₕs))), fill(missing, 1, length(unique(nₕs))),
         lw = 2, legend = true, legendfontsize = 12,
-        label = reshape(sort(unique(nₕs)), 1, :), 
-        linecolor = reshape([HSV(ΔH*nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
+        label = reshape(sort(unique(nₕs)), 1, :),
+        linecolor = reshape([HSV(ΔH * nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
     )
-    plot!(sg, HyperEdge[he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
+    return plot!(
+        sg, HyperEdge[he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
         label = false, color = HSV(ΔH, 1, 0.75), lw = 5
     )
 end

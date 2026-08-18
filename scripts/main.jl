@@ -13,27 +13,27 @@ roi_nr = 12
 # read data
 
 begin
-    today = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0"*x : x) |> x -> x[1] * "-" * x[2]
+    today = now() |> monthday .|> string .|> (x -> length(x) == 1 ? "0" * x : x) |> x -> x[1] * "-" * x[2]
 
     nₕ_min = 1
     pₛ = 0.2
     dist_threshold = 3
     reverse_y = true
 
-    filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv";
-    filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv";
-    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min);
+    filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv"
+    filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
+    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
 
     hypothesis_plot(sg)
 end
 
-model, time =  @timed solve_rsa(
-    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 10*60, hotstart_time = 2*60, 
+model, time = @timed solve_rsa(
+    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 10 * 60, hotstart_time = 2 * 60,
     num_roots = 2, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5
 )
 
 roots = get_roots(sg, model);
-plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min")
+plot(roots, size = (800, 800), title = "Time: $(round(time / 60, digits = 1)) min")
 examine(roots)
 
 savefig(homedir() * "/Downloads/test.svg")
@@ -41,13 +41,13 @@ savefig("results/roi$(roi_nr)_roots_$(today).svg")
 
 # multi
 
-sgs = get_subgraphs(sg; pₛ, nₕ_min) |> 
+sgs = get_subgraphs(sg; pₛ, nₕ_min) |>
     sgs -> filter(x -> length(x) > 20, sgs);
 
 begin
     plot(legend = false)
     for (i, sg) in enumerate(sgs)
-        plot!(sg, color = HSV(i/length(sgs) * 360, 1, 1), augmented_alpha = 0.05)
+        plot!(sg, color = HSV(i / length(sgs) * 360, 1, 1), augmented_alpha = 0.05)
     end
     plot!()
 end
@@ -58,7 +58,7 @@ plot(sgs[subidx], size = (1000, 800))
 hypothesis_plot(sgs[subidx])
 
 model, time = @timed solve_rsa(
-    sgs[subidx]; optimizer = Gurobi.Optimizer, time_limit = 13*60, hotstart_time = 2*60,
+    sgs[subidx]; optimizer = Gurobi.Optimizer, time_limit = 13 * 60, hotstart_time = 2 * 60,
     num_roots = 1
 )
 
@@ -66,7 +66,7 @@ model, time = @timed solve_rsa(
 # savefig("results/roi$(roi_nr)-$(subidx)_classification_$(today).svg")
 
 roots = get_roots(sgs[subidx], model)
-plot(roots, size = (800, 800), title = "Time: $(round(time/60, digits = 1)) min", lw = 1)
+plot(roots, size = (800, 800), title = "Time: $(round(time / 60, digits = 1)) min", lw = 1)
 savefig("results/roi$(roi_nr)-$(subidx)_roots_$(today).svg")
 
 # NN predictions

@@ -1,7 +1,8 @@
 # read in data from file
 
-function read_data(file::String, id_colname::Symbol;
-    delim::Char = ',', groupdelim::Char = '"', superdelim::Char = ';'
+function read_data(
+        file::String, id_colname::Symbol;
+        delim::Char = ',', groupdelim::Char = '"', superdelim::Char = ';'
     )
 
     lines = readlines(file)
@@ -9,7 +10,7 @@ function read_data(file::String, id_colname::Symbol;
     processed_lines = lines .|>
         x -> split_line(x, delim, groupdelim) .|>
         x -> autoparse(x, delim, superdelim)
-    
+
     header = processed_lines[1] .|> Symbol
     data = processed_lines[2:end] |> x -> reduce(hcat, x)
 
@@ -17,16 +18,18 @@ function read_data(file::String, id_colname::Symbol;
         [header[i] => vectorpromote(data[i, :]) for i in eachindex(header)]
     )
 
-    idwise_dict = Dict([
-        id => Dict([colname => data_dict[colname][i] for colname in header if colname != id_colname])
-        for (i, id) in enumerate(data_dict[id_colname])
-    ])
+    idwise_dict = Dict(
+        [
+            id => Dict([colname => data_dict[colname][i] for colname in header if colname != id_colname])
+                for (i, id) in enumerate(data_dict[id_colname])
+        ]
+    )
 
     return idwise_dict
 end
 
 function split_line(line, delim::Char, groupdelim::Char)
-    line_groups = line |> 
+    line_groups = line |>
         x -> split(x, groupdelim) |>
         x -> x[.!isempty.(x)] |>
         x -> single_strip.(x, delim)
@@ -34,7 +37,7 @@ function split_line(line, delim::Char, groupdelim::Char)
     line_elements = [
         line_group |>
             x -> isodd(i) ? split(x, delim) : [x]
-        for (i, line_group) in enumerate(line_groups)
+            for (i, line_group) in enumerate(line_groups)
     ] |> x -> reduce(vcat, x)
 
     return line_elements

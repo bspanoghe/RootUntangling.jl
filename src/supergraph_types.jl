@@ -41,10 +41,10 @@ struct SingularEdge{T, U} <: AbstractEdge{T}
     src::T
     dst::T
     hyperedge::HyperEdge{T, U}
-    
+
     SingularEdge(src::T, dst::T, hyperedge::HyperEdge{T, U}) where {T, U} = (
         new{T, U}(sort([src, dst])..., hyperedge)
-    )    
+    )
 end
 hyperedge(se::SingularEdge) = se.hyperedge
 
@@ -54,8 +54,8 @@ id(av::AbstractVertex) = av.id
 edges(av::AbstractVertex) = av.edges
 edges(avs::Vector{<:AbstractVertex}) = reduce(vcat, edges.(avs), init = eltype(avs)[])
 
-Base.show(io::IO, av::AbstractVertex) = print(io, "$(typeof(av).name.name)$( (id(av), edges(av)) )")
-Base.show(io::IO, avs::Vector{<:AbstractVertex}) = print(io, "$(typeof(avs).name.name)$( id.(avs) )")
+Base.show(io::IO, av::AbstractVertex) = print(io, "$(typeof(av).name.name)$((id(av), edges(av)))")
+Base.show(io::IO, avs::Vector{<:AbstractVertex}) = print(io, "$(typeof(avs).name.name)$(id.(avs))")
 
 """
     HyperVertex{T, U}
@@ -122,11 +122,13 @@ struct SuperGraph{T, U}
 
     Eₕ₀::Vector{HyperEdge{T}}
     Eₕ₊::Vector{HyperEdge{T}}
-    E₀::Vector{SingularEdge{T, U}} 
+    E₀::Vector{SingularEdge{T, U}}
     E₊::Vector{SingularEdge{T, U}}
-    function SuperGraph(Vₕ₀::Vector{HyperVertex{T, U}}, Vₕ₊::Vector{HyperVertex{T, U}},
-        V₀::Vector{SingularVertex{T, U}}, V₊::Vector{SingularVertex{T, U}}) where {T, U}
-        
+    function SuperGraph(
+            Vₕ₀::Vector{HyperVertex{T, U}}, Vₕ₊::Vector{HyperVertex{T, U}},
+            V₀::Vector{SingularVertex{T, U}}, V₊::Vector{SingularVertex{T, U}}
+        ) where {T, U}
+
         # sort all vertices
         sort!(Vₕ₀, by = x -> id(x))
         sort!(Vₕ₊, by = x -> -id(x)) # special vertices use negative integers as id
@@ -166,9 +168,9 @@ E(sg::SuperGraph) = [E₊(sg); E₀(sg)]
 Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
 
 E₂(sv::SingularVertex) = [
-    [edges(sv)[i], edges(sv)[j]] 
-    for i in eachindex(edges(sv)) for j in eachindex(edges(sv))
-    if (i > j) && !all(is_augmented.(edges(sv)[[i, j]]))
+    [edges(sv)[i], edges(sv)[j]]
+        for i in eachindex(edges(sv)) for j in eachindex(edges(sv))
+        if (i > j) && !all(is_augmented.(edges(sv)[[i, j]]))
 ]
 E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[])
 E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]

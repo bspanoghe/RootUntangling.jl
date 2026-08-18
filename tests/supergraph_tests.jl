@@ -11,10 +11,12 @@ pg = PreGraph(
         Segment(6, [2, 3], 1.0, false);
         Segment(7, [2, 4], 1.0, false);
     ],
-    Dict([
-        -1 => MetaVertex(-1, :appearance),
-        [i => MetaVertex(i, [:a, :b, :c, :d][i], [-1.0, 0.0, 1.0, 0.0][i], [0.0, 0.0, 0.0, 1.0][i]) for i in 1:4]...
-    ])
+    Dict(
+        [
+            -1 => MetaVertex(-1, :appearance),
+            [i => MetaVertex(i, [:a, :b, :c, :d][i], [-1.0, 0.0, 1.0, 0.0][i], [0.0, 0.0, 0.0, 1.0][i]) for i in 1:4]...,
+        ]
+    )
 );
 pₛ = 0.1;
 sg = get_supergraph(pg; pₛ);
@@ -41,7 +43,7 @@ issetequal(
     [1, 2, 3, 4]
 )
 
-# gethypervertex 
+# gethypervertex
 id(gethypervertex(Vₕ₀(sg), 1)) == 1
 
 # # singular vertices
@@ -98,7 +100,7 @@ hes = Eₕ(sg)[[5, 6]] # edges with a straight angle
 cosine_similarity(sg, hes..., 2) == -1
 
 hes = Eₕ(sg)[[5, 7]] # edges with a 90 degree angle
-isapprox(cosine_similarity(sg, hes..., 2), 0.0, atol = 1e-12)
+isapprox(cosine_similarity(sg, hes..., 2), 0.0, atol = 1.0e-12)
 
 # # connections
 connections = E₂(sg);
@@ -115,6 +117,6 @@ issetequal(
         [(-1, 1), (1, 6)],
         [(1, 4), (1, 5)],
         [(1, 4), (1, 6)],
-        [(1, 5), (1, 6)]
+        [(1, 5), (1, 6)],
     ] .|> sort
 )

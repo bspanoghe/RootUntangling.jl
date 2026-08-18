@@ -9,7 +9,7 @@ function get_roots(sg::SuperGraph, model::JuMP.Model)
     se_classification_dict = get_se_classification_dict(sg, model)
     polarity_classification_dict = get_polarity_classification_dict(sg, model)
     active_edges = [e for e in E₀(sg) if abs(se_classification_dict[e]) > 0]
-    
+
     roots = Root[]
     while !isempty(active_edges)
         current_root = Root(active_edges[1], se_classification_dict, sg)
@@ -68,7 +68,7 @@ end
 
 # divide roots into separate root systems
 function separate_root_systems(sg::SuperGraph, se_classification_dict::Dict, rs::Vector{Root})
-    primary_roots = filter(is_primary, rs) 
+    primary_roots = filter(is_primary, rs)
     lateral_roots = filter(!is_primary, rs)
     root_systems = [[pr] for pr in primary_roots]
 
@@ -77,13 +77,15 @@ function separate_root_systems(sg::SuperGraph, se_classification_dict::Dict, rs:
         for (i, primary_root) in enumerate(primary_roots)
             pr_nb_vertices = reduce(vcat, V.([sg], hypervertex.(V(primary_root))))
             roots_match = [
-                sv_lat in pr_nb_vertices && 
-                imag(se_classification_dict[
-                    edges(sv_lat)[findfirst(se -> src(se) == -3, edges(sv_lat))]
-                    ]) == 1
-                for sv_lat in V(lateral_root)[[1, end]]
+                sv_lat in pr_nb_vertices &&
+                    imag(
+                        se_classification_dict[
+                            edges(sv_lat)[findfirst(se -> src(se) == -3, edges(sv_lat))],
+                        ]
+                    ) == 1
+                    for sv_lat in V(lateral_root)[[1, end]]
             ] |> all
-            
+
             if roots_match
                 push!(root_systems[i], lateral_root)
                 found_exact_match = true

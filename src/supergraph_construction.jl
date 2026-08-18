@@ -24,17 +24,20 @@ For the file containing edge/segment information.
 - `primary_score_colname`: NN-predicted probability of the segment containing a primary root.
 - `coords_colname`: The y and x coordinates of each pixel of the segment.
 """
-function get_supergraph(filename_segments::String, filename_vertices::String;
+function get_supergraph(
+        filename_segments::String, filename_vertices::String;
         dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
         x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
         segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
         primary_score_colname = :Heatmap_Mean, coords_colname = :Coords
     )
-    
-    pg = get_pregraph(filename_segments, filename_vertices; dist_threshold, reverse_y, node_id_colname,
+
+    pg = get_pregraph(
+        filename_segments, filename_vertices; dist_threshold, reverse_y, node_id_colname,
         segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
-        dist_colname, primary_score_colname, coords_colname)
+        dist_colname, primary_score_colname, coords_colname
+    )
     sg = get_supergraph(pg; pₛ, nₕ_min)
 
     return sg
@@ -45,23 +48,23 @@ function get_supergraph(pg::PreGraph; pₛ, nₕ_min)
 
     Vₕ₀ = [
         get_hypervertex(pg, mv, nₕs, i)
-        for (i, mv) in enumerate(getmetavertices(pg))
-        if !isspecial(mv)
+            for (i, mv) in enumerate(getmetavertices(pg))
+            if !isspecial(mv)
     ]
     Vₕ₊ = [
         HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), NaN, [id(mv)])
-        for mv in getmetavertices(pg)
-        if isspecial(mv)
+            for mv in getmetavertices(pg)
+            if isspecial(mv)
     ]
     V₀ = (
-    [
-        getsingularvertices(hv, [Vₕ₀; Vₕ₊])
-        for hv in Vₕ₀
-    ] |> x -> reduce(vcat, x)
+        [
+            getsingularvertices(hv, [Vₕ₀; Vₕ₊])
+                for hv in Vₕ₀
+        ] |> x -> reduce(vcat, x)
     )
     V₊ = [
         getsingularvertices(hv, [Vₕ₀; Vₕ₊])
-        for hv in Vₕ₊
+            for hv in Vₕ₊
     ] |> x -> reduce(vcat, x)
 
     return SuperGraph(Vₕ₀, Vₕ₊, V₀, V₊)
@@ -84,7 +87,7 @@ end
 
 # instantiate a hypervertex based on a metavertex
 function get_hypervertex(pg::PreGraph{T, U, V}, mv::MetaVertex{T, U}, nₕs::Vector{<:Integer}, i::Integer) where {T, U, V}
-    prev_id = sum(nₕs[1:i-1]) # amount of vertices that have been defined in previous hypervertices
+    prev_id = sum(nₕs[1:(i - 1)]) # amount of vertices that have been defined in previous hypervertices
     vertices = collect(prev_id .+ (1:nₕs[i]))
 
     return HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv), vertices)
@@ -95,18 +98,18 @@ SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
 
 # get singular vertices corresponding with a given hypervertex (containing the correct edges)
 function getsingularvertices(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
-    [
+    return [
         SingularVertex(
-            v,
-            [
-                SingularEdge{T, U}[
-                    SingularEdge(v, v_nb, he) 
-                    for v_nb in vertices(neighbor(hv, he, Vₕ))
-                ]
-                for he in edges(hv)
-            ] |> x -> reduce(vcat, x, init = SingularEdge{T, U}[]),
-            hv
-        )
-        for v in vertices(hv)
+                v,
+                [
+                    SingularEdge{T, U}[
+                        SingularEdge(v, v_nb, he)
+                        for v_nb in vertices(neighbor(hv, he, Vₕ))
+                    ]
+                    for he in edges(hv)
+                ] |> x -> reduce(vcat, x, init = SingularEdge{T, U}[]),
+                hv
+            )
+            for v in vertices(hv)
     ]
 end

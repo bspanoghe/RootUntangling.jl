@@ -12,18 +12,18 @@ begin
 
     for pₛ in pₛ_values
         for roi_nr in 1:7
-            filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv";
-            filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv";
+            filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv"
+            filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
 
             sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, pₛ, flip_y = true)
 
             connections_by_vertex = [
                 [
-                    [edges(v)[i], edges(v)[j]] 
-                    for i in eachindex(edges(v)) for j in eachindex(edges(v))
-                    if i > j
-                ]
-                for v in V₀(sg)
+                        [edges(v)[i], edges(v)[j]]
+                        for i in eachindex(edges(v)) for j in eachindex(edges(v))
+                        if i > j
+                    ]
+                    for v in V₀(sg)
             ]
             connections = reduce(vcat, connections_by_vertex)
 
@@ -39,29 +39,33 @@ begin
 end
 
 datadict = (
-    readlines(file) .|> 
-    (x -> split(x, ", ")) |>
-    (x -> reduce(hcat, x)) |>
-    permutedims |>
-    x -> [Symbol(c[1]) => parse.(Float64, c[2:end]) for c in eachcol(x)] |>
-    Dict
+    readlines(file) .|>
+        (x -> split(x, ", ")) |>
+        (x -> reduce(hcat, x)) |>
+        permutedims |>
+        x -> [Symbol(c[1]) => parse.(Float64, c[2:end]) for c in eachcol(x)] |>
+        Dict
 )
 
 begin
-    p_vc2 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[1]], datadict[:n_c][datadict[:p_s] .== pₛ_values[1]],
+    p_vc2 = scatter(
+        datadict[:n_v][datadict[:p_s] .== pₛ_values[1]], datadict[:n_c][datadict[:p_s] .== pₛ_values[1]],
         legend = false, title = "pₛ = $(pₛ_values[1])"
     )
-    p_vc3 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[2]], datadict[:n_c][datadict[:p_s] .== pₛ_values[2]],
+    p_vc3 = scatter(
+        datadict[:n_v][datadict[:p_s] .== pₛ_values[2]], datadict[:n_c][datadict[:p_s] .== pₛ_values[2]],
         legend = false, title = "pₛ = $(pₛ_values[2])", xlabel = "Number of vertices"
     )
     plot(p_vc2, p_vc3, layout = (2, 1), ylabel = "Number of connections")
 end
 
 begin
-    p_ve2 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[1]], datadict[:n_e][datadict[:p_s] .== pₛ_values[1]],
+    p_ve2 = scatter(
+        datadict[:n_v][datadict[:p_s] .== pₛ_values[1]], datadict[:n_e][datadict[:p_s] .== pₛ_values[1]],
         legend = false, title = "pₛ = $(pₛ_values[1])"
     )
-    p_ve3 = scatter(datadict[:n_v][datadict[:p_s] .== pₛ_values[2]], datadict[:n_e][datadict[:p_s] .== pₛ_values[2]],
+    p_ve3 = scatter(
+        datadict[:n_v][datadict[:p_s] .== pₛ_values[2]], datadict[:n_e][datadict[:p_s] .== pₛ_values[2]],
         legend = false, title = "pₛ = $(pₛ_values[2])", xlabel = "Number of vertices"
     )
     plot(p_ve2, p_ve3, layout = (2, 1), ylabel = "Number of edges")

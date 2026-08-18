@@ -16,7 +16,7 @@ function Root(
         sg::SuperGraph{T, U}
     ) where {T, U}
     @assert haskey(se_classification_dict, se)
-    Root(
+    return Root(
         real(se_classification_dict[se]) == 1,
         [getsingularvertex(sg, v) for v in vertices(se)],
     )
@@ -34,9 +34,9 @@ Base.length(r::Root) = length(r.V)
 
 Calculate the physical length of a root.
 """
-curve_length(r::Root) = sqrt.(diff(xs(r)).^2 + diff(ys(r)).^2) |> sum
-distance(r::Root) = sqrt( (ys(r)[end] - ys(r)[1])^2 +  (xs(r)[end] - xs(r)[1])^2 )
-distance(v::SingularVertex, r::Root) = minimum(sqrt.( (x(v) .- xs(r)).^2 + (y(v) .- ys(r)).^2 ))
+curve_length(r::Root) = sqrt.(diff(xs(r)) .^ 2 + diff(ys(r)) .^ 2) |> sum
+distance(r::Root) = sqrt((ys(r)[end] - ys(r)[1])^2 + (xs(r)[end] - xs(r)[1])^2)
+distance(v::SingularVertex, r::Root) = minimum(sqrt.((x(v) .- xs(r)) .^ 2 + (y(v) .- ys(r)) .^ 2))
 tortuosity(r::Root) = curve_length(r) / distance(r)
 tortuosity(rs::Vector{<:Root}) = sum(tortuosity.(rs))
 
@@ -55,12 +55,13 @@ function examine(rs::Vector{<:Root}; digits = 2)
 
     println("Primary root length: $(curve_length(rs[1]) |> f)")
     println("Number of lateral roots: $(length(rs) - 1)")
-    println("Average lateral root length: $( sum(curve_length.(rs[2:end]))/length(rs[2:end]) |> f)")
+    println("Average lateral root length: $(sum(curve_length.(rs[2:end])) / length(rs[2:end]) |> f)")
     println("Individual lateral root lengths:")
     for (i, r) in enumerate(rs)
         i == 1 && continue # only do lateral roots but start from i=2
         println("Root $i: $(curve_length(rs[i]) |> f)")
     end
+    return
 end
 
 function examine(rss::Vector{<:Vector{<:Root}}; digits = 2)
@@ -69,4 +70,5 @@ function examine(rss::Vector{<:Vector{<:Root}}; digits = 2)
         examine(rs; digits)
         println("")
     end
+    return
 end
