@@ -6,21 +6,19 @@ mutable struct Segment{T, U}
     id::T
     vertices::Vector{T}
     width::U
-    is_fake::Bool
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove later
     xs::Vector{<:Number}
     ys::Vector{<:Number}
 end
-Segment(id::T, vertices::Vector{T}, width::U, is_fake,
+Segment(id::T, vertices::Vector{T}, width::U,
     pred_primary::Union{U, Missing}, xs, ys) where {T, U} = (
-    Segment(id, vertices, width, Bool(is_fake), pred_primary, xs, ys)
+    Segment(id, vertices, width, pred_primary, xs, ys)
 )
 
-Segment(id, vertices) = Segment(id, vertices, NaN, false, NaN, Number[], Number[])
+Segment(id, vertices) = Segment(id, vertices, NaN, NaN, Number[], Number[])
 id(s::Segment) = s.id
 vertices(s::Segment) = s.vertices
 width(s::Segment) = s.width
-is_fake(s::Segment) = s.is_fake
 pred_primary(s::Segment) = s.pred_primary
 xs(s::Segment) = s.xs
 ys(s::Segment) = s.ys

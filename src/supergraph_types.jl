@@ -15,7 +15,7 @@ Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.n
 """
     HyperEdge{T, U}
 
-Represents an edge in between two hypervertices.
+Represents a segment from a root scan, which may contain one or multiple roots.
 """
 struct HyperEdge{T, U} <: AbstractEdge{T}
     src::T
@@ -112,6 +112,14 @@ y(sv::SingularVertex) = y(hypervertex(sv))
 coords(sv::SingularVertex) = coords(hypervertex(sv))
 
 # graphs
+"""
+    SuperGraph{T, U}
+
+Represents one or more root systems.
+
+The (singular) edges E represent the possible presence of a single root, 
+while hyperedges Eₕ are groups of edges at the same position, representing a segment in the scan which may contain multiple roots.
+"""
 struct SuperGraph{T, U}
     Vₕ₀::Vector{HyperVertex{T, U}}
     Vₕ₊::Vector{HyperVertex{T, U}}
@@ -169,6 +177,8 @@ E₂(sv::SingularVertex) = [
 E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[])
 E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]
 
+Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
+
 getsingularvertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(sg)[v] : V₊(sg)[-v]
 gethypervertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? Vₕ₀(sg)[v] : Vₕ₊(sg)[-v]
 width(sg::SuperGraph, se::SingularEdge) = width(hyperedge(se)) / minimum(order.(getsingularvertex.([sg], vertices(se))))
@@ -184,7 +194,8 @@ neighbors(sg::SuperGraph{T, U}, av::AbstractVertex{T, U}) where {T, U} = [neighb
 inner_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) > 1]
 outer_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) == 1]
 
-Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
+xs(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = x.(V(sg, se))
+ys(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = y.(V(sg, se))
 
 # some additional methods to make model definition look nicer
 V(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]

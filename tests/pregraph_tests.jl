@@ -9,9 +9,9 @@ vertex_data_dict = Dict(
 )
 
 edge_data_dict = Dict(
-    1 => Dict(:fake => false, :width => 1.5),
-    2 => Dict(:fake => false, :width => 2.0),
-    3 => Dict(:fake => false, :width => 0.5),
+    1 => Dict(:width => 1.5),
+    2 => Dict(:width => 2.0),
+    3 => Dict(:width => 0.5),
 )
 
 pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);

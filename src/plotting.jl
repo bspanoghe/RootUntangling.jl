@@ -167,6 +167,10 @@ function Plots.plot(r::Root; kwargs...)
     linestyle = is_primary(r) ? :solid : :dot
     plot(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
 end
+function Plots.plot!(r::Root; kwargs...)
+    linestyle = is_primary(r) ? :solid : :dot
+    plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
+end
 
 function Plots.plot(rs::Vector{<:Root}; kwargs...)
     plot()
@@ -177,12 +181,6 @@ function Plots.plot(rs::Vector{<:Root}; kwargs...)
     end
     plot!(aspect_ratio = :equal; kwargs...)
 end
-
-function Plots.plot!(r::Root; kwargs...)
-    linestyle = is_primary(r) ? :solid : :dot
-    plot!(xs(r), ys(r); linestyle, color = :black, aspect_ratio = :equal, linewidth = 1, kwargs...)
-end
-
 function Plots.plot!(rs::Vector{<:Root}; kwargs...)
     for (i, r) in enumerate(rs)
         linestyle = is_primary(r) ? :solid : :dot
@@ -191,9 +189,30 @@ function Plots.plot!(rs::Vector{<:Root}; kwargs...)
     end
 end
 
+function Plots.plot(rss::Vector{<:Vector{<:Root}}; kwargs...)
+    plot()
+    for rs in rss
+        plot!(rs; kwargs...)
+    end
+    plot!(aspect_ratio = :equal; kwargs...)
+end
+function Plots.plot!(rss::Vector{<:Vector{<:Root}}; kwargs...)
+    for rs in rss
+        plot!(rs; kwargs...)
+    end
+end
+
+
+
+
 
 # custom plots
-function hypothesis_plot(sg::SuperGraph; ΔH = 80)
+"""
+    hypothesis_plot(sg::SuperGraph)
+
+Visualise the maximum allowed number of roots per segment of a graph.
+"""
+function hypothesis_plot(sg::SuperGraph)
     nₕs = [
         maximum([length(vertices(hv)) for hv in gethypervertex.(vertices(he), [Vₕ(sg)])])
         for he in Eₕ(sg)
@@ -202,6 +221,7 @@ function hypothesis_plot(sg::SuperGraph; ΔH = 80)
         maximum([length(vertices(hv)) for hv in gethypervertex.(vertices(he), [Vₕ(sg)])])
         for he in Eₕ₀(sg)
     ]
+    ΔH = 360 / maximum(nₕs)
 
     plot(sg, size = (600, 800), label = false, edge_kwargs = 
         Dict(

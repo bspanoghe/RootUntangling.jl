@@ -1,5 +1,5 @@
 polarity(se::SingularEdge{T, U}, sv::SingularVertex{T, U}) where {T, U} = src(se) == id(sv) ? 1 : -1
-
+polarity(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id(sv1) < id(sv2) ? 1 : -1
 
 angle(hv1::HyperVertex{T, U}, hv2::HyperVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
     reverse_order ? atan(y(hv1) - y(hv2), x(hv1) - x(hv2)) :  atan(y(hv2) - y(hv1), x(hv2) - x(hv1))
@@ -21,6 +21,3 @@ cosine_similarity(sg::SuperGraph{T, U}, ae::AbstractEdge{T}, α; reverse_order::
 angle_dissimilarity(sg::SuperGraph{T, U}, ae1::AbstractEdge{T}, ae2::AbstractEdge{T}, v::T) where {T, U} = (
     (1 - cosine_similarity(sg, ae1, ae2, v)) / 2
 )
-
-xs(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = x.(V(sg, se))
-ys(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = y.(V(sg, se))

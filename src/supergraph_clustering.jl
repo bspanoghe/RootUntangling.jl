@@ -1,3 +1,11 @@
+"""
+    get_subgraphs(sg::SuperGraph; augmented_margins::Real = 0.1, pₛ = 0.2, nₕ_min = 1)
+
+Separate all unconnected subgraphs of the graph. 
+
+`augmented_margins` controls the position of the augmented vertices on a plot and is purely for aesthetics.
+`pₛ` and `nₕ_min` have the same definition as in [`get_supergraph`](@ref).
+"""
 function get_subgraphs(sg::SuperGraph; augmented_margins::Real = 0.1, pₛ = 0.2, nₕ_min = 1)
     hvs = copy(Vₕ₀(sg))
     hv_clusters = typeof(hvs)[]
