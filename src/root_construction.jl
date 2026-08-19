@@ -41,7 +41,8 @@ function grow!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U}) wher
     new_vertex_idx = findfirst(x -> !(x in vertices(r)[[1, end]]), vertices(se))
     if isnothing(new_vertex_idx)
         @warn "Loop found in root"
-        new_vertex = vertices(r)[1]
+        return nothing
+        # new_vertex = vertices(r)[1]
     else
         new_vertex = vertices(se)[new_vertex_idx]
     end
@@ -75,9 +76,10 @@ function separate_root_systems(sg::SuperGraph, se_classification_dict::Dict, rs:
     for lateral_root in lateral_roots
         found_exact_match = false
         for (i, primary_root) in enumerate(primary_roots)
+
             pr_nb_vertices = reduce(vcat, V.([sg], hypervertex.(V(primary_root))))
             roots_match = [
-                sv_lat in pr_nb_vertices &&
+                sv_lat in pr_nb_vertices && !isnothing(findfirst(se -> src(se) == -3, edges(sv_lat))) &&
                     imag(
                         se_classification_dict[
                             edges(sv_lat)[findfirst(se -> src(se) == -3, edges(sv_lat))],

@@ -26,7 +26,7 @@ end
 function getmetavertices(vertex_data_dict::Dict)
     metavertices = MetaVertex{Int64, Float64}[
         MetaVertex(i, Symbol(vertex_entry[1]), [float(vertex_entry[2][col]) for col in [:x, :y, :pred_split]]...)
-            for (i, vertex_entry) in enumerate(vertex_data_dict)
+            for (i, vertex_entry) in enumerate(sort(vertex_data_dict))
     ]
     return metavertices
 end

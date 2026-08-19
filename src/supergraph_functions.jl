@@ -6,7 +6,6 @@ gethypervertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? Vₕ₀(sg)[v]
 # get information from a singularedge that requires graph information
 xs(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = x.(V(sg, se))
 ys(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = y.(V(sg, se))
-width(sg::SuperGraph, se::SingularEdge) = width(hyperedge(se)) / minimum(order.(getsingularvertex.([sg], vertices(se))))
 
 # get neighbors
 neighbor(hv::HyperVertex{T, U}, he::HyperEdge{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = (

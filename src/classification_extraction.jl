@@ -2,8 +2,8 @@
 # one graph
 
 function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    ea = [var for var in all_variables(model) if !isnothing(match(r"^ea\[\d+\]$", JuMP.name(var)))]
-    ep = [var for var in all_variables(model) if !isnothing(match(r"^ep\[\d+\]$", JuMP.name(var)))]
+    ea = value.(model[:ea])
+    ep = value.(model[:ep])
 
     se_classification_dict = [E(sg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i])) * im for i in eachindex(E(sg))] |> Dict
 
@@ -18,8 +18,8 @@ function get_he_classification_dict(sg::SuperGraph, model::JuMP.Model)
 end
 
 function get_sv_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    va = [var for var in all_variables(model) if !isnothing(match(r"^va\[\d+\]$", JuMP.name(var)))]
-    vp = [var for var in all_variables(model) if !isnothing(match(r"^vp\[\d+\]$", JuMP.name(var)))]
+    va = value.(model[:va])
+    vp = value.(model[:vp])
 
     sv_classification_dict = [V₀(sg)[i] => round(Bool, value(vp[i])) + round(Bool, value(va[i]) - value(vp[i])) * im for i in eachindex(V₀(sg))] |> Dict
 
@@ -34,7 +34,7 @@ function get_hv_classification_dict(sg::SuperGraph, model::JuMP.Model)
 end
 
 function get_polarity_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    e₊ = [var for var in all_variables(model) if !isnothing(match(r"^e₊\[\d+\]$", JuMP.name(var)))]
+    e₊ = value.(model[:e₊])
 
     polarity_classification_dict = [E(sg)[i] => round(Bool, value(e₊[i])) for i in eachindex(E(sg))] |> Dict
 

@@ -68,7 +68,7 @@ function get_linear_chains(hes::Vector{<:HyperEdge})
         tail_idx = findfirst(he -> !isdisjoint(vertices(chain[end]), vertices(he)), remaining_hes)
         if !isnothing(tail_idx)
             he = popat!(remaining_hes, tail_idx)
-            pushfirst!(chain, he)
+            push!(chain, he)
             continue
         end
 
