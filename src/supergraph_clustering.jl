@@ -82,15 +82,9 @@ end
 
 function get_num_hypotheses(hv_cluster::Vector{<:HyperVertex}, hv::HyperVertex; pₛ, nₕ_min)
     hes = edges.(hv_cluster) |> x -> reduce(vcat, x) |> unique
-    nₕ = [get_num_hypotheses(hes, he; pₛ, nₕ_min) for he in edges(hv) if !is_augmented(he)] |> maximum
-
-    return nₕ
-end
-
-function get_num_hypotheses(hes::Vector{<:HyperEdge}, he::HyperEdge; pₛ, nₕ_min)
     all_widths = [width(he) for he in hes if !is_augmented(he)]
     single_width = quantile(all_widths, pₛ)
-    nₕ = nₕ_min + div(width(he), single_width, RoundDown) |> Int
+    nₕ = [nₕ_min + floor(Int64, width(he)/single_width) for he in edges(hv) if !is_augmented(he)] |> maximum
 
     return nₕ
 end

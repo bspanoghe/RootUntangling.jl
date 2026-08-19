@@ -10,12 +10,6 @@ mutable struct Segment{T, U}
     xs::Vector{<:Number}
     ys::Vector{<:Number}
 end
-Segment(
-    id::T, vertices::Vector{T}, width::U,
-    pred_primary::Union{U, Missing}, xs, ys
-) where {T, U} = (
-    Segment(id, vertices, width, pred_primary, xs, ys)
-)
 
 Segment(id, vertices) = Segment(id, vertices, NaN, NaN, Number[], Number[])
 id(s::Segment) = s.id

@@ -10,7 +10,7 @@ export hypothesis_plot # fancy plotting
 export read_data, get_edge_info, get_vertex_info # data reading
 export get_pregraph # data to graph
 export src, dst, vertices, hyperedge, width, pred_primary, is_augmented, are_connected # edges
-export id, edges, x, y, pred_split, xs, ys, hypervertex, exclusion_sets # vertices
+export id, edges, x, y, pred_split, xs, ys, hypervertex # vertices
 export Vₕ₀, Vₕ₊, V₀, V₊, Vₕ, V, Eₕ₀, Eₕ₊, E₀, E₊, Eₕ, E, E₂, neighbors # graphs
 export get_he_classification_dict, get_se_classification_dict, get_hv_classification_dict, get_sv_classification_dict # get results
 

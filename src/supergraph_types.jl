@@ -124,6 +124,8 @@ struct SuperGraph{T, U}
     Eₕ₊::Vector{HyperEdge{T}}
     E₀::Vector{SingularEdge{T, U}}
     E₊::Vector{SingularEdge{T, U}}
+
+    he2e::Dict{HyperEdge{T}, Vector{SingularEdge{T, U}}}
     function SuperGraph(
             Vₕ₀::Vector{HyperVertex{T, U}}, Vₕ₊::Vector{HyperVertex{T, U}},
             V₀::Vector{SingularVertex{T, U}}, V₊::Vector{SingularVertex{T, U}}
@@ -147,7 +149,13 @@ struct SuperGraph{T, U}
         E₀ = [e for e in edges(V₀) if !(is_augmented(e))] |> unique |> es -> sort(es, by = e -> src(e))
         E₊ = edges(V₊) |> unique |> es -> sort(es, by = e -> src(e))
 
-        return new{T, U}(Vₕ₀, Vₕ₊, V₀, V₊, Eₕ₀, Eₕ₊, E₀, E₊)
+        # precompute mappings
+        he2e = Dict([
+            he => unique([e for e in [E₀; E₊] if hyperedge(e) == he])
+            for he in [Eₕ₀; Eₕ₊]
+        ])
+
+        return new{T, U}(Vₕ₀, Vₕ₊, V₀, V₊, Eₕ₀, Eₕ₊, E₀, E₊, he2e)
     end
 end
 Vₕ₀(sg::SuperGraph) = sg.Vₕ₀
@@ -159,6 +167,8 @@ Eₕ₀(sg::SuperGraph) = sg.Eₕ₀
 Eₕ₊(sg::SuperGraph) = sg.Eₕ₊
 E₀(sg::SuperGraph) = sg.E₀
 E₊(sg::SuperGraph) = sg.E₊
+
+E(sg::SuperGraph, he::HyperEdge) = sg.he2e[he]
 
 Vₕ(sg::SuperGraph) = [Vₕ₊(sg); Vₕ₀(sg)]
 V(sg::SuperGraph) = [V₊(sg); V₀(sg)]
@@ -185,9 +195,8 @@ Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(Vₕ(sg), v) for v in [src
 E(av::AbstractVertex) = edges(av)
 E(avs::Vector{<:AbstractVertex}) = reduce(vcat, E.(avs), init = eltype(avs)[])
 E(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = E(V(sg, hv))
-E(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = [e for e in E(sg) if hyperedge(e) == he] |> unique
-E₀(av::AbstractVertex) = [e for e in E(av) if !is_augmented(e)]
+E₀(av::AbstractVertex) = filter(!is_augmented, E(av))
 Eₕ(hv::HyperVertex) = edges(hv)
 Eₕ(sv::SingularVertex) = Eₕ(Vₕ(sv))
 Eₕ(se::SingularEdge) = hyperedge(se)
-Eₕ₀(sv::SingularVertex) = [he for he in Eₕ(sv) if !is_augmented(he)]
+Eₕ₀(sv::SingularVertex) = filter(!is_augmented, Eₕ(sv))
