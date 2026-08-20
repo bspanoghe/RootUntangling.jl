@@ -252,5 +252,5 @@ bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 ρₙₙ(seg; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(seg) |> p -> bound(p; ϵ)
 
 # root overlap probability
-ρ₀(sv::SingularVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(sv)) |> p -> bound(p; ϵ)
-order(sv::SingularVertex) = id(sv) - vertices(hypervertex(sv))[1]
+ρ₀(rv::RootVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(sv)) |> p -> bound(p; ϵ)
+order(rv::RootVertex) = id(sv) - vertices(hypervertex(sv))[1]
