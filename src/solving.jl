@@ -25,8 +25,11 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 """
 function solve_rsa(
         rg::RootGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi / 2, ϵ = 1e-3
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = exp(1),
+        α_down = -pi / 2, ϵ = 1e-3
     )
+
+    @assert ρₒ_base >= 1 "The base for the overlap probability must be greater or equal than 1."
 
     # check for NN prediction data #! remove for final version
     NN_pred = pred_primary(E₀(rg)[1]) |> !ismissing
@@ -80,7 +83,7 @@ function solve_rsa(
             ea2f[e] * log(ρₐ / (1 - ρₐ))
                 for e in edges(vₐ)
         ) +
-            # original segments should be active
+        # standard hyperedges should be active
             sum(
             sa2f[seg] * log(ρₕ / (1 - ρₕ))
                 for seg in segments₀(rg)
@@ -107,6 +110,11 @@ function solve_rsa(
                     sp2f[seg] * log(ρₙₙ(seg; ρₙₙ_max, ϵ) / (1 - ρₙₙ(seg; ρₙₙ_max, ϵ)))
                     for seg in segments₀(rg)
                 )
+        ) +
+            # overlap probability
+            sum(
+            va2f[v] * log(ρ₀(v; ρₒ_base, ϵ) / (1 - ρ₀(v; ρₒ_base, ϵ)))
+                for v in V₀(sg)
         )
     )
 
@@ -193,7 +201,8 @@ function solve_rsa(
 
     if (hotstart_time > 0) && add_momentum
         @info "Running hotstart"
-        start_model = solve_rsa(rg; optimizer, add_momentum = false, time_limit = hotstart_time, num_roots, ρₐ, ρₕ, ϵ)
+        start_model = solve_rsa(rg; optimizer, add_momentum = false, time_limit = hotstart_time,
+            num_roots, ρₐ, ρₕ, ρₘ_max, ρₙₙ_max, ρᵧ_max, ρₒ_base, α_down, ϵ)
         vars = all_variables(start_model)
         sols = value.(vars)
         for (start_var, start_sol) in zip(vars, sols)
@@ -241,3 +250,7 @@ bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # NN pred primary probability
 ρₙₙ(seg; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(seg) |> p -> bound(p; ϵ)
+
+# root overlap probability
+ρ₀(sv::SingularVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(sv)) |> p -> bound(p; ϵ)
+order(sv::SingularVertex) = id(sv) - vertices(hypervertex(sv))[1]
