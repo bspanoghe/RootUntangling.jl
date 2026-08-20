@@ -26,7 +26,7 @@ For the file containing edge/segment information.
 """
 function get_rootgraph(
         filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1,
+        dist_threshold::Real, reverse_y::Bool,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
         x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
         segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
@@ -38,53 +38,34 @@ function get_rootgraph(
         segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
         dist_colname, primary_score_colname, coords_colname
     )
-    rg = get_rootgraph(pg; pₛ, nₕ_min)
+    rg = get_rootgraph(pg)
 
     return rg
 end
 
-function get_rootgraph(pg::PreGraph{T, U, V}; pₛ, nₕ_min) where {T, U, V}
+function get_rootgraph(pg::PreGraph{T, U, V}) where {T, U, V}
     bps = getbranchpoints(pg)
 
-    # assign each branchpoint its vertex ids:
-    # one hypothetical root vertex per possible root passing through an original branchpoint,
-    # the branchpoint id itself for augmented branchpoints
-    bp2vs = Dict{T, Vector{T}}()
-    v_max = 0
-    for bp in bps
-        nₕ = isspecial(bp) ? 0 : get_num_hypotheses(pg, bp; pₛ, nₕ_min)
-        bp2vs[id(bp)] = isspecial(bp) ? [id(bp)] : collect(v_max .+ (1:nₕ))
-        v_max += nₕ
-    end
-
-    # connect each vertex of a branchpoint to all vertices of its neighboring branchpoints
-    rootedges(bp, v) = [
-        RootEdge(v, w, width(s), pred_primary(s))
-            for s in segments(pg, bp)
-            for w in bp2vs[other_vertex(s, id(bp))]
-    ]
-
     V₀ = [
-        RootVertex(v, rootedges(bp, v), x(bp), y(bp), pred_split(bp))
+        RootVertex(id(bp), [RootEdge(s) for s in segments(pg, bp)], x(bp), y(bp), pred_split(bp))
             for bp in bps if !isspecial(bp)
-            for v in bp2vs[id(bp)]
     ]
     V₊ = [
-        RootVertex(id(bp), rootedges(bp, id(bp)), x(bp), y(bp), NaN)
+        RootVertex(id(bp), [RootEdge(s) for s in segments(pg, bp)], x(bp), y(bp), pred_split(bp))
             for bp in bps if isspecial(bp)
     ]
 
     return RootGraph(V₀, V₊)
 end
 
-# the vertex at the other end of a segment
-other_vertex(s::Segment{T, U}, v::T) where {T, U} = vertices(s)[1] == v ? vertices(s)[2] : vertices(s)[1]
+# create edge from segment
+RootEdge(s::Segment) = RootEdge(vertices(s)..., width(s), pred_primary(s))
 
 # get amount of hypotheses corresponding to a branchpoint
-function get_num_hypotheses(pg::PreGraph, bp::BranchPoint; pₛ, nₕ_min)
-    all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
-    single_width = quantile(all_widths, pₛ)
-    nₕ = [nₕ_min + floor(Int64, width(s) / single_width) for s in segments(pg, bp) if !isspecial(s)] |> maximum
+# function get_num_hypotheses(pg::PreGraph, bp::BranchPoint; pₛ, nₕ_min)
+#     all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
+#     single_width = quantile(all_widths, pₛ)
+#     nₕ = [nₕ_min + floor(Int64, width(s) / single_width) for s in segments(pg, bp) if !isspecial(s)] |> maximum
 
-    return nₕ
-end
+#     return nₕ
+# end
