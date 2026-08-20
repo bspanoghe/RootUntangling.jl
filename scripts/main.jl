@@ -22,17 +22,17 @@ begin
 
     filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
+    rg = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
 
-    hypothesis_plot(sg)
+    hypothesis_plot(rg)
 end
 
 model, time = @timed solve_rsa(
-    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 10 * 60, hotstart_time = 2 * 60,
+    rg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 10 * 60, hotstart_time = 2 * 60,
     num_roots = 2, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5
 )
 
-roots = get_roots(sg, model);
+roots = get_roots(rg, model);
 plot(roots, size = (800, 800), title = "Time: $(round(time / 60, digits = 1)) min")
 examine(roots)
 
@@ -41,40 +41,40 @@ savefig("results/roi$(roi_nr)_roots_$(today).svg")
 
 # multi
 
-sgs = get_subgraphs(sg; pₛ, nₕ_min) |>
-    sgs -> filter(x -> length(x) > 20, sgs);
+rgs = get_subgraphs(rg; pₛ, nₕ_min) |>
+    rgs -> filter(x -> length(V₀(x)) > 20, rgs);
 
 begin
     plot(legend = false)
-    for (i, sg) in enumerate(sgs)
-        plot!(sg, color = HSV(i / length(sgs) * 360, 1, 1), augmented_alpha = 0.05)
+    for (i, rg) in enumerate(rgs)
+        plot!(rg, color = HSV(i / length(rgs) * 360, 1, 1), augmented_alpha = 0.05)
     end
     plot!()
 end
 
 subidx = 1
 
-plot(sgs[subidx], size = (1000, 800))
-hypothesis_plot(sgs[subidx])
+plot(rgs[subidx], size = (1000, 800))
+hypothesis_plot(rgs[subidx])
 
 model, time = @timed solve_rsa(
-    sgs[subidx]; optimizer = Gurobi.Optimizer, time_limit = 13 * 60, hotstart_time = 2 * 60,
+    rgs[subidx]; optimizer = Gurobi.Optimizer, time_limit = 13 * 60, hotstart_time = 2 * 60,
     num_roots = 1
 )
 
-# plot(sgs[subidx], get_he_classification_dict(sgs[subidx], model), size = (800, 800))
+# plot(rgs[subidx], get_segment_classification_dict(rgs[subidx], model), size = (800, 800))
 # savefig("results/roi$(roi_nr)-$(subidx)_classification_$(today).svg")
 
-roots = get_roots(sgs[subidx], model)
+roots = get_roots(rgs[subidx], model)
 plot(roots, size = (800, 800), title = "Time: $(round(time / 60, digits = 1)) min", lw = 1)
 savefig("results/roi$(roi_nr)-$(subidx)_roots_$(today).svg")
 
 # NN predictions
 
 plot(
-    sgs[subidx], size = (800, 800),
-    edge_kwargs = Dict(:color => [HSV(0, 1, pred_primary(he)) for he in Eₕ(sgs[subidx])] |> x -> reshape(x, 1, :)),
-    vertex_kwargs = Dict(:color => [HSV(120, 1, pred_split(hv)) for hv in Vₕ(sgs[subidx])])
+    rgs[subidx], size = (800, 800),
+    edge_kwargs = Dict(:color => [HSV(0, 1, pred_primary(seg)) for seg in segments(rgs[subidx])] |> x -> reshape(x, 1, :)),
+    vertex_kwargs = Dict(:color => [HSV(120, 1, pred_split(rv)) for rv in V(rgs[subidx])])
 )
 savefig(homedir() * "\\Downloads\\wa.svg")
 
@@ -89,28 +89,28 @@ begin
 end
 
 ## does switching work
-isdefined(Main, :sgs) && (sg = sgs[subidx]);
+isdefined(Main, :rgs) && (rg = rgs[subidx]);
 begin
-    roots = get_roots(sg, model)
-    overlap_dict = RootUntangling.find_overlaps(sg, model, roots)
-    overlap_edges = collect(keys(overlap_dict))
-    he = overlap_edges[1]
-    r1 = overlap_dict[he][1]
-    r2 = overlap_dict[he][2]
+    roots = get_roots(rg, model)
+    overlap_dict = RootUntangling.find_overlaps(rg, model, roots)
+    overlap_segments = collect(keys(overlap_dict))
+    seg = overlap_segments[1]
+    r1 = overlap_dict[seg][1]
+    r2 = overlap_dict[seg][2]
 
     p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
-    plot!(sg, he, color = :red, linestyle = :solid, lw = 5, alpha = 0.3)
-    RootUntangling.switch!(sg, he, r1, r2)
+    plot!(rg, seg, color = :red, linestyle = :solid, lw = 5, alpha = 0.3)
+    RootUntangling.switch!(rg, seg, r1, r2)
     p_after = plot(roots, title = "Total tort: $(tortuosity(roots))")
-    plot!(sg, he, color = :red, linestyle = :solid, lw = 5, alpha = 0.3, label = false)
+    plot!(rg, seg, color = :red, linestyle = :solid, lw = 5, alpha = 0.3, label = false)
     plot(p_before, p_after)
 end
 
 ## does greedy search work
-isdefined(Main, :sgs) && (sg = sgs[subidx]);
+isdefined(Main, :rgs) && (rg = rgs[subidx]);
 begin
-    roots = get_roots(sg, model)
-    roots_improved = greedy_switch(sg, model, roots; max_tries = 100)
+    roots = get_roots(rg, model)
+    roots_improved = greedy_switch(rg, model, roots; max_tries = 100)
 
     p_before = plot(roots, size = (1000, 800), title = "Total tort: $(tortuosity(roots))")
     p_after = plot(roots_improved, title = "Total tort: $(tortuosity(roots_improved))")

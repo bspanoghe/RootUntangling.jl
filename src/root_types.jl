@@ -9,16 +9,16 @@ You can inspect these using the function [`examine`](@ref) or manually calculate
 """
 struct Root{T, U}
     is_primary::Bool
-    V::Vector{SingularVertex{T, U}}
+    V::Vector{RootVertex{T, U}}
 end
 function Root(
-        se::SingularEdge{T, U}, se_classification_dict::Dict{SingularEdge{T, U}, Complex{Int64}},
-        sg::SuperGraph{T, U}
+        re::RootEdge{T, U}, edge_classification_dict::Dict{RootEdge{T, U}, <:Complex},
+        rg::RootGraph{T, U}
     ) where {T, U}
-    @assert haskey(se_classification_dict, se)
+    @assert haskey(edge_classification_dict, re)
     return Root(
-        real(se_classification_dict[se]) == 1,
-        [getsingularvertex(sg, v) for v in vertices(se)],
+        real(edge_classification_dict[re]) == 1,
+        [getvertex(rg, v) for v in vertices(re)],
     )
 end
 is_primary(r::Root) = r.is_primary
@@ -36,7 +36,7 @@ Calculate the physical length of a root.
 """
 curve_length(r::Root) = sqrt.(diff(xs(r)) .^ 2 + diff(ys(r)) .^ 2) |> sum
 distance(r::Root) = sqrt((ys(r)[end] - ys(r)[1])^2 + (xs(r)[end] - xs(r)[1])^2)
-distance(v::SingularVertex, r::Root) = minimum(sqrt.((x(v) .- xs(r)) .^ 2 + (y(v) .- ys(r)) .^ 2))
+distance(rv::RootVertex, r::Root) = minimum(sqrt.((x(rv) .- xs(r)) .^ 2 + (y(rv) .- ys(r)) .^ 2))
 tortuosity(r::Root) = curve_length(r) / distance(r)
 tortuosity(rs::Vector{<:Root}) = sum(tortuosity.(rs))
 

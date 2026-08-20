@@ -1,104 +1,95 @@
 # PreGraph plotting
-Plots.plot(vs::Vector{<:MetaVertex}; kwargs...) = scatter(x.(vs), y.(vs); kwargs...)
-Plots.plot!(vs::Vector{<:MetaVertex}; kwargs...) = scatter!(x.(vs), y.(vs); kwargs...)
+Plots.plot(bps::Vector{<:BranchPoint}; kwargs...) = scatter(x.(bps), y.(bps); kwargs...)
+Plots.plot!(bps::Vector{<:BranchPoint}; kwargs...) = scatter!(x.(bps), y.(bps); kwargs...)
 
-Plots.plot(v::MetaVertex; kwargs...) = plot([v]; kwargs...)
-Plots.plot!(v::MetaVertex; kwargs...) = plot!([v]; kwargs...)
+Plots.plot(bp::BranchPoint; kwargs...) = plot([bp]; kwargs...)
+Plots.plot!(bp::BranchPoint; kwargs...) = plot!([bp]; kwargs...)
 
 Plots.plot(g::PreGraph, s::Segment; kwargs...) = plot(
-    [x(getmetavertex(g, v)) for v in vertices(s)], [y(getmetavertex(g, v)) for v in vertices(s)]; kwargs...
+    [x(getbranchpoint(g, v)) for v in vertices(s)], [y(getbranchpoint(g, v)) for v in vertices(s)]; kwargs...
 )
 Plots.plot!(g::PreGraph, s::Segment; kwargs...) = plot!(
-    [x(getmetavertex(g, v)) for v in vertices(s)], [y(getmetavertex(g, v)) for v in vertices(s)]; kwargs...
+    [x(getbranchpoint(g, v)) for v in vertices(s)], [y(getbranchpoint(g, v)) for v in vertices(s)]; kwargs...
 )
 
 Plots.plot(g::PreGraph, ss::Vector{Segment{T, U}}; kwargs...) where {T, U} = plot(
-    [x(getmetavertex(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :),
-    [y(getmetavertex(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :);
+    [x(getbranchpoint(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :),
+    [y(getbranchpoint(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :);
     kwargs...
 )
 
 Plots.plot!(g::PreGraph, ss::Vector{Segment{T, U}}; kwargs...) where {T, U} = plot!(
-    [x(getmetavertex(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :),
-    [y(getmetavertex(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :);
+    [x(getbranchpoint(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :),
+    [y(getbranchpoint(g, v)) for s in ss for v in vertices(s)] |> x -> reshape(x, 2, :);
     kwargs...
 )
 
 function Plots.plot(g::PreGraph; vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     p = plot(; kwargs...)
     plot!(g, segments(g); color = :black, edge_kwargs..., kwargs...)
-    plot!(getmetavertices(g); color = :grey, markersize = 2, vertex_kwargs..., kwargs...)
+    plot!(getbranchpoints(g); color = :grey, markersize = 2, vertex_kwargs..., kwargs...)
     return p
 end
 
-# SuperGraph plotting
+# RootGraph plotting
 
 # vertices
-Plots.plot(avs::Vector{<:AbstractVertex}; kwargs...) = scatter(x.(avs), y.(avs); kwargs...)
-Plots.plot!(avs::Vector{<:AbstractVertex}; kwargs...) = scatter!(x.(avs), y.(avs); kwargs...)
-Plots.plot(av::AbstractVertex; kwargs...) = plot([av]; kwargs...)
-Plots.plot!(av::AbstractVertex; kwargs...) = plot!([av]; kwargs...)
+Plots.plot(rvs::Vector{<:RootVertex}; kwargs...) = scatter(x.(rvs), y.(rvs); kwargs...)
+Plots.plot!(rvs::Vector{<:RootVertex}; kwargs...) = scatter!(x.(rvs), y.(rvs); kwargs...)
+Plots.plot(rv::RootVertex; kwargs...) = plot([rv]; kwargs...)
+Plots.plot!(rv::RootVertex; kwargs...) = plot!([rv]; kwargs...)
 
 # edges
-Plots.plot(sg::SuperGraph, ses::Vector{<:SingularEdge}; kwargs...) = plot(
-    [x(getsingularvertex(sg, v)) for se in ses for v in vertices(se)] |> x -> reshape(x, 2, :),
-    [y(getsingularvertex(sg, v)) for se in ses for v in vertices(se)] |> x -> reshape(x, 2, :);
+Plots.plot(rg::RootGraph, res::Vector{<:RootEdge}; kwargs...) = plot(
+    [x(getvertex(rg, v)) for re in res for v in vertices(re)] |> x -> reshape(x, 2, :),
+    [y(getvertex(rg, v)) for re in res for v in vertices(re)] |> x -> reshape(x, 2, :);
     kwargs...
 )
-Plots.plot!(sg::SuperGraph, ses::Vector{<:SingularEdge}; kwargs...) = plot!(
-    [x(getsingularvertex(sg, v)) for se in ses for v in vertices(se)] |> x -> reshape(x, 2, :),
-    [y(getsingularvertex(sg, v)) for se in ses for v in vertices(se)] |> x -> reshape(x, 2, :);
+Plots.plot!(rg::RootGraph, res::Vector{<:RootEdge}; kwargs...) = plot!(
+    [x(getvertex(rg, v)) for re in res for v in vertices(re)] |> x -> reshape(x, 2, :),
+    [y(getvertex(rg, v)) for re in res for v in vertices(re)] |> x -> reshape(x, 2, :);
     kwargs...
 )
-Plots.plot(sg::SuperGraph, se::SingularEdge; kwargs...) = plot(sg, [se]; kwargs...)
-Plots.plot!(sg::SuperGraph, se::SingularEdge; kwargs...) = plot!(sg, [se]; kwargs...)
+Plots.plot(rg::RootGraph, re::RootEdge; kwargs...) = plot(rg, [re]; kwargs...)
+Plots.plot!(rg::RootGraph, re::RootEdge; kwargs...) = plot!(rg, [re]; kwargs...)
 
-Plots.plot(sg::SuperGraph, hes::Vector{<:HyperEdge}; kwargs...) = plot(
-    [x(gethypervertex(sg, v)) for he in hes for v in vertices(he)] |> x -> reshape(x, 2, :),
-    [y(gethypervertex(sg, v)) for he in hes for v in vertices(he)] |> x -> reshape(x, 2, :);
-    kwargs...
-)
-Plots.plot!(sg::SuperGraph, hes::Vector{<:HyperEdge}; kwargs...) = plot!(
-    [x(gethypervertex(sg, v)) for he in hes for v in vertices(he)] |> x -> reshape(x, 2, :),
-    [y(gethypervertex(sg, v)) for he in hes for v in vertices(he)] |> x -> reshape(x, 2, :);
-    kwargs...
-)
-Plots.plot(sg::SuperGraph, he::HyperEdge; kwargs...) = plot(sg, [he]; kwargs...)
-Plots.plot!(sg::SuperGraph, he::HyperEdge; kwargs...) = plot!(sg, [he]; kwargs...)
+# segments (one line per segment of the scan, using a representative edge)
+Plots.plot(rg::RootGraph, segs::Vector{<:Vector{<:RootEdge}}; kwargs...) = plot(rg, first.(segs); kwargs...)
+Plots.plot!(rg::RootGraph, segs::Vector{<:Vector{<:RootEdge}}; kwargs...) = plot!(rg, first.(segs); kwargs...)
 
 # graph
-function Plots.plot!(sg::SuperGraph; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot!(rg::RootGraph; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     plot!(
-        sg, Eₕ(sg); color = :black,
-        alpha = [is_augmented(he) ? augmented_alpha : 1.0 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
+        rg, segments(rg); color = :black,
+        alpha = [is_augmented(seg) ? augmented_alpha : 1.0 for seg in segments(rg)] |> x -> reshape(x, 1, :),
         edge_kwargs..., kwargs...
     )
 
-    annotate && merge!(vertex_kwargs, Dict(:annotation => [(x(hv), y(hv), text("$(id(hv))", 8, :right, :bottom)) for hv in Vₕ(sg)]))
-    return plot!(Vₕ(sg); color = :grey, markersize = 2, vertex_kwargs..., kwargs...)
+    annotate && merge!(vertex_kwargs, Dict(:annotation => [(x(rv), y(rv), text("$(id(rv))", 8, :right, :bottom)) for rv in V(rg)]))
+    return plot!(V(rg); color = :grey, markersize = 2, vertex_kwargs..., kwargs...)
 end
 
-function Plots.plot(sg::SuperGraph; aspect_ratio = :equal, legend = false, annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot(rg::RootGraph; aspect_ratio = :equal, legend = false, annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     p = plot(; aspect_ratio, legend, kwargs...)
-    plot!(sg; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
+    plot!(rg; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
     return p
 end
 
 # multiple graphs
-function Plots.plot(sgs::Vector{<:SuperGraph}; augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot(rgs::Vector{<:RootGraph}; augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     p = plot(; aspect_ratio, legend, kwargs...)
-    for sg in sgs
-        plot!(sg; augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
+    for rg in rgs
+        plot!(rg; augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
     end
     return p
 end
 
 # with classification
-# ## hyperedges
-function Plots.plot!(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+# ## segments
+function Plots.plot!(rg::RootGraph, segment_classification_dict::Dict{<:Vector{<:RootEdge}, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     classification_edge_kwargs = Dict(
-        :color => [(real(he_classification_dict[he]) > 0) * RGB(1.0, 0, 0) + (imag(he_classification_dict[he]) > 0) * RGB(0, 0, 1.0) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
-        :linewidth => [abs(he_classification_dict[he]) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
+        :color => [(real(segment_classification_dict[seg]) > 0) * RGB(1.0, 0, 0) + (imag(segment_classification_dict[seg]) > 0) * RGB(0, 0, 1.0) for seg in segments(rg)] |> x -> reshape(x, 1, :),
+        :linewidth => [abs(segment_classification_dict[seg]) for seg in segments(rg)] |> x -> reshape(x, 1, :),
     )
     classification_vertex_kwargs = Dict(
         :color => :grey,
@@ -107,59 +98,43 @@ function Plots.plot!(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <
 
     merge!(edge_kwargs, classification_edge_kwargs)
     merge!(vertex_kwargs, classification_vertex_kwargs)
-    annotate && merge!(vertex_kwargs, Dict(:annotation => [(x(hv), y(hv), text("$(id(hv))", 8, :right, :bottom)) for hv in Vₕ(sg)]))
+    annotate && merge!(vertex_kwargs, Dict(:annotation => [(x(rv), y(rv), text("$(id(rv))", 8, :right, :bottom)) for rv in V(rg)]))
 
-    p = plot!(sg; augmented_alpha, edge_kwargs, vertex_kwargs, kwargs...)
+    p = plot!(rg; augmented_alpha, edge_kwargs, vertex_kwargs, kwargs...)
 
     return p
 end
 
-function Plots.plot(sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
+function Plots.plot(rg::RootGraph, segment_classification_dict::Dict{<:Vector{<:RootEdge}, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
     p = plot(; aspect_ratio, legend, kwargs...)
-    plot!(sg, he_classification_dict; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
+    plot!(rg, segment_classification_dict; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
 
     return p
 end
 
 function Plots.plot(
-        sgs::Vector{SuperGraph{T, U}}, he_classification_dict::Dict{Int64, Dict{HyperEdge{T, U}, Complex{Int64}}};
+        rgs::Vector{RootGraph{T, U}}, segment_classification_dict::Dict{Int64, <:Dict{<:Vector{<:RootEdge}, <:Complex}};
         annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false,
         vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     ) where {T, U}
 
     p = plot(; aspect_ratio, legend, kwargs...)
-    for (i, sg) in enumerate(sgs)
-        plot!(sg, he_classification_dict[i]; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
+    for (i, rg) in enumerate(rgs)
+        plot!(rg, segment_classification_dict[i]; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
     end
 
     return p
 end
 
-# ## singular edges
-function Plots.plot!(sg::SuperGraph, se_classification_dict::Dict{<:SingularEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
-    classification_edge_kwargs = Dict(
-        :color => [(real(se_classification_dict[he]) > 0) * RGB(1.0, 0, 0) + (imag(se_classification_dict[he]) > 0) * RGB(0, 0, 1.0) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
-        :linewidth => [abs(se_classification_dict[he]) for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
-    )
-    classification_vertex_kwargs = Dict(
-        :color => :grey,
-        :markersize => 2,
-    )
-
-    merge!(edge_kwargs, classification_edge_kwargs)
-    merge!(vertex_kwargs, classification_vertex_kwargs)
-    annotate && merge!(vertex_kwargs, Dict(:annotation => [(x(hv), y(hv), text("$(id(hv))", 8, :right, :bottom)) for hv in Vₕ(sg)]))
-
-    p = plot!(sg; augmented_alpha, edge_kwargs, vertex_kwargs, kwargs...)
-
-    return p
+# ## edges (aggregated per segment)
+function Plots.plot!(rg::RootGraph, edge_classification_dict::Dict{<:RootEdge, <:Complex}; kwargs...)
+    segment_classification_dict = Dict([seg => sum([edge_classification_dict[e] for e in seg]) for seg in segments(rg)])
+    return plot!(rg, segment_classification_dict; kwargs...)
 end
 
-function Plots.plot(sg::SuperGraph, se_classification_dict::Dict{<:SingularEdge, <:Complex}; annotate::Bool = false, augmented_alpha = 0.1, aspect_ratio = :equal, legend = false, vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...)
-    p = plot(; aspect_ratio, legend, kwargs...)
-    plot!(sg, se_classification_dict; annotate, augmented_alpha, vertex_kwargs, edge_kwargs, kwargs...)
-
-    return p
+function Plots.plot(rg::RootGraph, edge_classification_dict::Dict{<:RootEdge, <:Complex}; kwargs...)
+    segment_classification_dict = Dict([seg => sum([edge_classification_dict[e] for e in seg]) for seg in segments(rg)])
+    return plot(rg, segment_classification_dict; kwargs...)
 end
 
 
@@ -207,36 +182,30 @@ end
 
 # custom plots
 """
-    hypothesis_plot(sg::SuperGraph)
+    hypothesis_plot(rg::RootGraph)
 
 Visualise the maximum allowed number of roots per segment of a graph.
 """
-function hypothesis_plot(sg::SuperGraph)
-    nₕs = [
-        maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
-            for he in Eₕ(sg)
-    ]
-    nₕ₀s = [
-        maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
-            for he in Eₕ₀(sg)
-    ]
+function hypothesis_plot(rg::RootGraph)
+    nₕ(seg) = max(length(srcs(seg)), length(dsts(seg))) # maximum number of roots on a segment
+    nₕs = nₕ.(segments(rg))
     ΔH = 360 / (maximum(nₕs) + 1)
 
     plot(
-        sg, size = (600, 800), label = false, edge_kwargs =
+        rg, size = (600, 800), label = false, edge_kwargs =
             Dict(
-            :linewidth => [width(he) / 2 for he in Eₕ(sg)] |> x -> reshape(x, 1, :),
-            :linecolor => [HSV(ΔH * nₕ, 1, 0.75) for nₕ in nₕs] |> x -> reshape(x, 1, :),
+            :linewidth => [width(seg) / 2 for seg in segments(rg)] |> x -> reshape(x, 1, :),
+            :linecolor => [HSV(ΔH * n, 1, 0.75) for n in nₕs] |> x -> reshape(x, 1, :),
         ),
     )
     plot!(
         fill(missing, 1, length(unique(nₕs))), fill(missing, 1, length(unique(nₕs))),
         lw = 2, legend = true, legendfontsize = 12,
         label = reshape(sort(unique(nₕs)), 1, :),
-        linecolor = reshape([HSV(ΔH * nₕ, 1, 0.75) for nₕ in sort(unique(nₕs))], 1, :)
+        linecolor = reshape([HSV(ΔH * n, 1, 0.75) for n in sort(unique(nₕs))], 1, :)
     )
     return plot!(
-        sg, HyperEdge[he for (nₕ₀, he) in zip(nₕ₀s, Eₕ₀(sg)) if nₕ₀ == 1], aspect_ratio = :equal,
+        rg, filter(seg -> nₕ(seg) == 1, segments₀(rg)), aspect_ratio = :equal,
         label = false, color = HSV(ΔH, 1, 0.75), lw = 5
     )
 end
