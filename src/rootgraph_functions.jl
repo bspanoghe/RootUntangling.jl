@@ -1,15 +1,9 @@
-# get a RootVertex from its id
+# get a rootvertex from vertex / edge
 getvertex(rg::RootGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(rg)[v] : V₊(rg)[-v]
-
-# the RootVertices of an edge
+V(rg::RootGraph{T, U}, v::T) where {T, U} = getvertex(rg, v)
 V(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = [getvertex(rg, v) for v in vertices(re)]
 
-# vertices at the same position, i.e. lying on the same branchpoint of the scan
-roommates(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = (
-    [rv2 for rv2 in V₀(rg) if isequal(coords(rv2), coords(rv))]
-)
-
-# get information from an edge that requires graph information
+# get edge coordinates
 xs(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = x.(V(rg, re))
 ys(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = y.(V(rg, re))
 
@@ -19,11 +13,8 @@ neighbor(rg::RootGraph{T, U}, rv::RootVertex{T, U}, re::RootEdge{T, U}) where {T
 )
 neighbors(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = [neighbor(rg, rv, re) for re in edges(rv)]
 
-# positions of the neighboring branchpoints of a vertex
-neighbor_positions(rg::RootGraph, rv::RootVertex) = unique(coords(nb) for nb in neighbors(rg, rv) if !is_augmented(nb))
-
-inner_vertices(rg::RootGraph) = [rv for rv in V₀(rg) if length(neighbor_positions(rg, rv)) > 1]
-outer_vertices(rg::RootGraph) = [rv for rv in V₀(rg) if length(neighbor_positions(rg, rv)) == 1]
+inner_vertices(rg::RootGraph) = [rv for rv in V₀(rg) if length(filter(!is_augmented, neighbors(rg, rv))) > 1]
+outer_vertices(rg::RootGraph) = [rv for rv in V₀(rg) if length(filter(!is_augmented, neighbors(rg, rv))) == 1]
 
 # polarity
 polarity(re::RootEdge{T, U}, rv::RootVertex{T, U}) where {T, U} = src(re) == id(rv) ? 1 : -1

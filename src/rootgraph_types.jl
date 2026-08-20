@@ -2,7 +2,7 @@
 """
     RootEdge{T, U}
 
-Represents the possible presence of a single root along a segment from a root scan.
+Represents a segment from a root scan.
 """
 struct RootEdge{T, U}
     src::T
@@ -35,7 +35,7 @@ Base.show(io::IO, re::RootEdge) = print(io, "RootEdge$(vertices(re))")
 """
     RootVertex{T, U}
 
-Represents the possible passage of a single root through a branchpoint or endpoint of a segment in the image.
+Represents a branchpoint or endpoint of a segment in the image.
 """
 struct RootVertex{T, U}
     id::T
@@ -61,24 +61,13 @@ is_augmented(rv::RootVertex) = is_augmented(id(rv))
 
 Base.show(io::IO, rv::RootVertex) = print(io, "RootVertex$((id(rv), edges(rv)))")
 
-# # segments
-# a segment from the scan is represented by the vector of parallel edges lying on it
-width(seg::Vector{<:RootEdge}) = width(first(seg))
-pred_primary(seg::Vector{<:RootEdge}) = pred_primary(first(seg))
-is_augmented(seg::Vector{<:RootEdge}) = is_augmented(first(seg))
-srcs(seg::Vector{<:RootEdge}) = unique(src.(seg))
-dsts(seg::Vector{<:RootEdge}) = unique(dst.(seg))
-vertices(seg::Vector{<:RootEdge}) = [srcs(seg); dsts(seg)]
-
 # # graphs
 """
     RootGraph{T, U}
 
 Represents one or more root systems.
 
-The edges E represent the possible presence of a single root, while the segments S are groups
-of edges at the same position, representing a segment in the scan which may contain multiple roots.
-Vertices, edges and segments are split into original (V₀ / E₀ / S₀) and augmented (V₊ / E₊ / S₊) ones.
+Vertices and edges are split into original (V₀ / E₀) and augmented (V₊ / E₊) ones.
 """
 struct RootGraph{T, U}
     V₀::Vector{RootVertex{T, U}}
@@ -86,9 +75,6 @@ struct RootGraph{T, U}
 
     E₀::Vector{RootEdge{T, U}}
     E₊::Vector{RootEdge{T, U}}
-
-    S₀::Vector{Vector{RootEdge{T, U}}}
-    S₊::Vector{Vector{RootEdge{T, U}}}
 
     function RootGraph(V₀::Vector{RootVertex{T, U}}, V₊::Vector{RootVertex{T, U}}) where {T, U}
         # sort all vertices
@@ -103,24 +89,8 @@ struct RootGraph{T, U}
         E₀ = [e for e in edges(V₀) if !is_augmented(e)] |> unique |> es -> sort(es, by = src)
         E₊ = edges(V₊) |> unique |> es -> sort(es, by = src)
 
-        # group edges by position: edges at the same position lie on the same segment of the scan
-        position = Dict(id(rv) => coords(rv) for rv in [V₀; V₊])
-        S₀ = group(e -> (position[src(e)], position[dst(e)]), E₀)
-        S₊ = group(e -> (position[src(e)], position[dst(e)]), E₊)
-
-        return new{T, U}(V₀, V₊, E₀, E₊, S₀, S₊)
+        return new{T, U}(V₀, V₊, E₀, E₊)
     end
-end
-
-# group the elements of `xs` by the value of `f`, preserving order
-function group(f, xs::Vector{T}) where {T}
-    groups = Vector{T}[]
-    group_idxs = Dict{Any, Int}()
-    for x in xs
-        i = get!(() -> (push!(groups, T[]); length(groups)), group_idxs, f(x))
-        push!(groups[i], x)
-    end
-    return groups
 end
 
 V₀(rg::RootGraph) = rg.V₀
@@ -131,10 +101,6 @@ E₀(rg::RootGraph) = rg.E₀
 E₊(rg::RootGraph) = rg.E₊
 E(rg::RootGraph) = [E₊(rg); E₀(rg)]
 
-segments₀(rg::RootGraph) = rg.S₀
-segments₊(rg::RootGraph) = rg.S₊
-segments(rg::RootGraph) = [segments₊(rg); segments₀(rg)]
-
 # pairs of edges meeting in a vertex, representing a possible root passing through it
 E₂(rv::RootVertex) = [
     [edges(rv)[i], edges(rv)[j]]
@@ -142,3 +108,4 @@ E₂(rv::RootVertex) = [
         if (i > j) && !all(is_augmented.(edges(rv)[[i, j]]))
 ]
 E₂(rg::RootGraph) = E₂.(V₀(rg)) |> x -> reduce(vcat, x, init = eltype(x)[])
+E₂(rv::RootVertex, re::RootEdge) = filter(c -> re in c, E₂(rv))
