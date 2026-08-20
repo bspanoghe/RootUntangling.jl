@@ -110,8 +110,10 @@ end
 
 function sort_root_system!(rs::Vector{<:Root})
     sort!(rs, by = is_primary, rev = true)
-    @assert !is_primary(rs[2]) "Root systems should only contain one primary root"
-    sort!(@view(rs[2:end]), by = curve_length, rev = true)
+    if length(rs) > 1
+        @assert !is_primary(rs[2]) "Root systems should only contain one primary root"
+        sort!(@view(rs[2:end]), by = curve_length, rev = true)
+    end
 
     return nothing
 end

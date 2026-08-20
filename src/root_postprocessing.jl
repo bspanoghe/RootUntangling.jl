@@ -24,6 +24,11 @@ function greedy_switch(sg, model, roots; max_tries = 100)
     return roots_copy
 end
 
+# does a root use one of the edges of a segment
+Base.in(he::HyperEdge, r::Root) = (
+    !any([isdisjoint(vs, vertices(r)) for vs in V(sg, he)])
+)
+
 # find hyperedges where multiple roots overlap (and can switch)
 function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     he_classification_dict = get_he_classification_dict(sg, model)
@@ -32,7 +37,7 @@ function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     # map all hyperedges to the roots they are part of
     # discarding roots of length 2 or smaller (switching does nothing)
     overlap_dict = [
-        he => [r for r in roots if !any([isdisjoint(vs, vertices(r)) for vs in V(sg, he)]) && length(r) > 2]
+        he => [r for r in roots if he ∈ r && length(r) > 2]
             for he in overlap_hes
     ] |> Dict
 
@@ -44,7 +49,7 @@ function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     ] |> x -> reduce(vcat, x) .|> first
 
     overlap_dict_subset = [
-        he => [r for r in roots if !any([isdisjoint(vs, vertices(r)) for vs in V(sg, he)])]
+        he => [r for r in roots if he ∈ r]
             for he in overlap_hes_subset
     ] |> Dict
 
