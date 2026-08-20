@@ -8,7 +8,7 @@ using Dates
 ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-roi_nr = 12
+roi_nr = 4
 
 # read data
 
@@ -22,7 +22,8 @@ begin
 
     filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    rg = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
+    pg = get_pregraph(filename_segments::String, filename_vertices::String; dist_threshold, reverse_y)
+    rg = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y)
 
     hypothesis_plot(rg)
 end
