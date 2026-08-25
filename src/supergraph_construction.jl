@@ -44,7 +44,9 @@ function get_supergraph(
 end
 
 function get_supergraph(pg::PreGraph; pₛ, nₕ_min)
-    nₕs = [get_num_hypotheses(pg, mv; pₛ, nₕ_min) for mv in getmetavertices(pg) if !isspecial(mv)]
+    all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
+    single_width = quantile(all_widths, pₛ)
+    nₕs = [get_num_hypotheses(pg, mv, single_width; nₕ_min) for mv in getmetavertices(pg) if !isspecial(mv)]
 
     Vₕ₀ = [
         get_hypervertex(pg, mv, nₕs, i)
@@ -71,12 +73,12 @@ function get_supergraph(pg::PreGraph; pₛ, nₕ_min)
 end
 
 # get amount of hypotheses corresponding to a metavertex
-function get_num_hypotheses(pg::PreGraph, mv::MetaVertex; pₛ, nₕ_min)
-    all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
-    single_width = quantile(all_widths, pₛ)
-    nₕ = [nₕ_min + floor(Int64, width(s)/single_width) for s in segments(pg, mv) if !isspecial(s)] |> maximum
+function get_num_hypotheses(pg::PreGraph, mv::MetaVertex, single_width::Number; nₕ_min)
+    return [nₕ_min + floor(Int64, width(s)/single_width) for s in segments(pg, mv) if !isspecial(s)] |> maximum
+end
 
-    return nₕ
+function get_num_hypotheses(hv::HyperVertex, single_width::Number; nₕ_min)
+    return [nₕ_min + floor(Int64, width(he)/single_width) for he in edges(hv) if !is_augmented(he)] |> maximum
 end
 
 # instantiate a hypervertex based on a metavertex
