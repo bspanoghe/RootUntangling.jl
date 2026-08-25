@@ -30,6 +30,9 @@ polarity(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id
 angle(hv1::HyperVertex{T, U}, hv2::HyperVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
     reverse_order ? atan(y(hv1) - y(hv2), x(hv1) - x(hv2)) : atan(y(hv2) - y(hv1), x(hv2) - x(hv1))
 )
+angle(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
+    angle(hypervertex(sv1), hypervertex(sv2); reverse_order)
+)
 angle(sg::SuperGraph{T, U}, se::SingularEdge{T, U}; reverse_order::Bool = false) where {T, U} = (
     vertices(se) .|> (v -> getsingularvertex(sg, v)) .|> hypervertex |> hvs -> angle(hvs...; reverse_order)
 )
