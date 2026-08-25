@@ -1,6 +1,6 @@
-function greedy_switch(sg, model, roots; max_tries = 100)
+function greedy_switch(sg, model, roots; max_tries = 100, f_obj::Function = roughness)
     roots_copy = deepcopy(roots)
-    current_tort = tortuosity(roots)
+    current_f = f_obj(roots)
     improving = true
 
     counter = 0
@@ -12,10 +12,11 @@ function greedy_switch(sg, model, roots; max_tries = 100)
         switch_dict = get_switch_dict(overlap_dict, roots_copy)
         n = maximum(keys(switch_dict))
 
-        torts = [total_tortuosity(sg, roots_copy, create_switches(n, i), switch_dict) for i in 1:n]
-        best_idx = argmin(torts)
-        if torts[best_idx] < current_tort
+        fs = [evaluate_objective(sg, roots_copy, f_obj, create_switches(n, i), switch_dict) for i in 1:n]
+        best_idx = argmin(fs)
+        if fs[best_idx] < current_f
             make_switches!(sg, roots_copy, create_switches(n, best_idx), switch_dict)
+            current_f = fs[best_idx]
         else
             improving = false
         end
@@ -25,19 +26,20 @@ function greedy_switch(sg, model, roots; max_tries = 100)
 end
 
 # does a root use one of the edges of a segment
-Base.in(he::HyperEdge, r::Root) = (
+are_overlapping(sg::SuperGraph, he::HyperEdge, r::Root) = (
     !any([isdisjoint(vs, vertices(r)) for vs in V(sg, he)])
 )
 
-# find hyperedges where multiple roots overlap (and can switch)
+# find hyperedges where multiple lateral roots overlap (and can switch)
+# primary root is not allowed to swap because it can break the assumption that only the primary root can split
 function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     he_classification_dict = get_he_classification_dict(sg, model)
-    overlap_hes = filter(he -> imag(he_classification_dict[he]) > 1, Eₕ₀(sg)) #! only looks for lateral overlaps
+    overlap_hes = filter(he -> imag(he_classification_dict[he]) > 1, Eₕ₀(sg))
 
     # map all hyperedges to the roots they are part of
     # discarding roots of length 2 or smaller (switching does nothing)
     overlap_dict = [
-        he => [r for r in roots if he ∈ r && length(r) > 2]
+        he => [r for r in roots if are_overlapping(sg, he, r) && length(r) > 2]
             for he in overlap_hes
     ] |> Dict
 
@@ -49,7 +51,7 @@ function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     ] |> x -> reduce(vcat, x) .|> first
 
     overlap_dict_subset = [
-        he => [r for r in roots if he ∈ r]
+        he => [r for r in roots if are_overlapping(sg, he, r)]
             for he in overlap_hes_subset
     ] |> Dict
 
@@ -100,10 +102,10 @@ function get_switch_dict(overlap_dict, roots)
     return Dict(switch_pairs)
 end
 
-function total_tortuosity(sg, roots, switches, switch_dict)
+function evaluate_objective(sg::SuperGraph, roots::Vector{<:Root}, f_obj::Function, switches::Vector{Bool}, switch_dict::Dict)
     roots_copy = deepcopy(roots)
     make_switches!(sg, roots_copy, switches, switch_dict)
-    return tortuosity(roots_copy)
+    return f_obj(roots_copy)
 end
 
 create_switches(n::Integer, i::Integer) = [zeros(Bool, i - 1); true; zeros(Bool, n - i)]

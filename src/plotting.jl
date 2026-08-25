@@ -188,7 +188,7 @@ function Plots.plot!(rs::Vector{<:Root}; kwargs...)
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
         plot!(xs(r), ys(r); linestyle, color, label = "$i", linewidth = 2, kwargs...)
     end
-    return
+    plot!()
 end
 
 function Plots.plot(rss::Vector{<:Vector{<:Root}}; kwargs...)

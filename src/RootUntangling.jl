@@ -4,7 +4,7 @@ export SuperGraph, get_supergraph # data to graph
 export get_subgraphs # separate graphs
 export solve_rsa # solving
 export Root, get_roots, examine, curve_length # get and examine roots
-export greedy_switch, tortuosity # postprocess roots
+export greedy_switch, roughness # postprocess roots
 export hypothesis_plot # fancy plotting
 # debugging exports
 export read_data, get_edge_info, get_vertex_info # data reading
