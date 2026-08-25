@@ -43,10 +43,12 @@ function solve_rsa(
     model = Model(optimizer)
 
     # define the model variables
+    connections = E₂(sg)
+
     n_v = length(V₀(sg))
     n_e = length(E(sg))
     n_he = length(Eₕ₀(sg))
-    add_momentum && (n_c = length(E₂(sg)))
+    add_momentum && (n_c = length(connections))
 
     @variable(model, va[1:n_v], Bin) # is vertex active (part of the root)
     @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
@@ -69,7 +71,7 @@ function solve_rsa(
     ep2f = Dict([E(sg)[i] => ep[i] for i in eachindex(E(sg))])
     e₊2f = Dict([E(sg)[i] => e₊[i] for i in eachindex(E(sg))])
 
-    add_momentum && (c2f = Dict([E₂(sg)[i] => f[i] for i in eachindex(E₂(sg))]))
+    add_momentum && (c2f = Dict([connections[i] => f[i] for i in eachindex(connections)]))
 
     hea2f = Dict([Eₕ₀(sg)[i] => he[i] for i in eachindex(Eₕ₀(sg))])
     NN_pred && (hep2f = Dict(Eₕ₀(sg)[i] => heₚ[i] for i in eachindex(Eₕ₀(sg))))
@@ -145,7 +147,7 @@ function solve_rsa(
     end
 
     # ### For a connection:
-    add_momentum && for c in E₂(sg)
+    add_momentum && for c in connections
         # It is active => its edges are active
         @constraint(model, sum(ea2f[e] for e in c) - 1 <= c2f[c])
     end
@@ -195,6 +197,15 @@ function solve_rsa(
     add_momentum || for v in V₀(sg), he in Eₕ₀(v)
         es = filter(e -> id(v) in vertices(e), E(sg, he))
         @constraint(model, sum(ea2f[e] for e in es) <= 1)
+    end
+
+    # symmetry breaking
+    for hv in Vₕ₀(sg)
+        svs = V(sg, hv)
+        for i in 2:length(svs)
+            @constraint(model, va2f[svs[i]] <= va2f[svs[i-1]])
+            @constraint(model, vp2f[svs[i]] <= vp2f[svs[i-1]])
+        end
     end
 
     # # Hotstart

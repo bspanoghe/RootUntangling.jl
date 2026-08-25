@@ -31,8 +31,12 @@ function get_subgraphs(sg::SuperGraph; augmented_margins::Real = 0.1, pₛ = 0.2
     # turn hv clusters into SuperGraphs
     subgraphs = Vector{typeof(sg)}(undef, length(hv_clusters))
     for (i, hv_cluster) in enumerate(hv_clusters)
+        hes = edges.(hv_cluster) |> x -> reduce(vcat, x) |> unique
+        all_widths = [width(he) for he in hes if !is_augmented(he)]
+        single_width = quantile(all_widths, pₛ)
+        nₕs = [get_num_hypotheses(hv, single_width; nₕ_min) for hv in hv_cluster]
+
         id_conversion_dict = Dict([id.(hv_cluster); -3:-1] .=> [eachindex(hv_cluster); -3:-1])
-        nₕs = [get_num_hypotheses(hv_cluster, hv; pₛ, nₕ_min) for hv in hv_cluster]
 
         recreated_Vₕ₀ = [recreate_Vₕ₀(hv, id_conversion_dict, nₕs, i) for (i, hv) in enumerate(hv_cluster)]
         recreated_Vₕ₊ = [recreate_Vₕ₊(hv, id_conversion_dict, recreated_Vₕ₀; augmented_margins) for hv in Vₕ₊(sg)]
@@ -78,13 +82,4 @@ function recreate_Vₕ₊(hv::HyperVertex{T, U}, id_conversion_dict::Dict, recre
     hv_new = HyperVertex(id_new, hes_new, coords_new..., NaN, vertices(hv))
 
     return hv_new
-end
-
-function get_num_hypotheses(hv_cluster::Vector{<:HyperVertex}, hv::HyperVertex; pₛ, nₕ_min)
-    hes = edges.(hv_cluster) |> x -> reduce(vcat, x) |> unique
-    all_widths = [width(he) for he in hes if !is_augmented(he)]
-    single_width = quantile(all_widths, pₛ)
-    nₕ = [nₕ_min + floor(Int64, width(he)/single_width) for he in edges(hv) if !is_augmented(he)] |> maximum
-
-    return nₕ
 end
