@@ -20,17 +20,21 @@ Represents a segment from a root scan, which may contain one or multiple roots.
 struct HyperEdge{T, U} <: AbstractEdge{T}
     src::T
     dst::T
+    segment_id::T
     width::U
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove Missing Union later
 
-    HyperEdge(src::T, dst::T, width::U, pred_primary::Union{U, Missing}) where {T, U} = (
-        new{T, U}(sort([src, dst])..., width, pred_primary)
+    HyperEdge(src::T, dst::T, segment_id::T, width::U, pred_primary::Union{U, Missing}) where {T, U} = (
+        new{T, U}(sort([src, dst])..., segment_id, width, pred_primary)
     )
 end
+segment_id(he::HyperEdge) = he.segment_id
 width(he::HyperEdge) = he.width
 pred_primary(he::HyperEdge) = he.pred_primary
 
-HyperEdge(src::T, dst::T) where {T} = HyperEdge(src, dst, NaN, NaN)
+HyperEdge(src::T, dst::T) where {T} = HyperEdge(src, dst, 0, NaN, NaN)
+HyperEdge(s::Segment) = HyperEdge(vertices(s)..., id(s), width(s), pred_primary(s))
+
 
 """
     SingularEdge{T, U}
@@ -47,6 +51,8 @@ struct SingularEdge{T, U} <: AbstractEdge{T}
     )
 end
 hyperedge(se::SingularEdge) = se.hyperedge
+
+SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
 
 # vertices
 abstract type AbstractVertex{T, U} end
@@ -82,6 +88,7 @@ vertices(hv::HyperVertex) = hv.vertices
 
 coords(hv::HyperVertex) = (x(hv), y(hv))
 is_augmented(hv::HyperVertex) = any(is_augmented.(vertices(hv)))
+vertices(hvs::Vector{<:HyperVertex}) = reduce(vcat, vertices.(hvs))
 
 """
     SingularVertex{T, U}
@@ -187,10 +194,9 @@ E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]
 
 # additional methods using mathematical syntax of V / V₀ / Vₕ / Vₕ₀ and E / E₀ / Eₕ / Eₕ₀
 V(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
-V(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = [vertices(gethypervertex(Vₕ(sg), v)) for v in vertices(he)]
 V(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(hv)]
 Vₕ(sv::SingularVertex) = hypervertex(sv)
-Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(Vₕ(sg), v) for v in [src(he), dst(he)]]
+Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(Vₕ(sg), v) for v in vertices(he)]
 
 E(av::AbstractVertex) = edges(av)
 E(avs::Vector{<:AbstractVertex}) = reduce(vcat, E.(avs), init = eltype(avs)[])

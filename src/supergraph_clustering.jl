@@ -59,7 +59,7 @@ end
 function recreate_Vₕ₀(hv::HyperVertex{T, U}, id_conversion_dict::Dict, nₕs::Vector{<:Integer}, i::Integer) where {T, U}
     id_new = id_conversion_dict[id(hv)]
     hes_new = HyperEdge{T, U}[
-        HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., width(he), pred_primary(he))
+        HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., segment_id(he), width(he), pred_primary(he))
             for he in E(hv) if all(haskey.([id_conversion_dict], vertices(he)))
     ]
 
@@ -74,7 +74,7 @@ end
 function recreate_Vₕ₊(hv::HyperVertex{T, U}, id_conversion_dict::Dict, recreated_Vₕ₀::Vector{HyperVertex{T, U}}; augmented_margins) where {T, U}
     id_new = id_conversion_dict[id(hv)]
     hes_new = HyperEdge{T, U}[
-        HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., width(he), pred_primary(he))
+        HyperEdge([id_conversion_dict[v] for v in vertices(he)]..., segment_id(he), width(he), pred_primary(he))
             for he in E(hv) if all(haskey.([id_conversion_dict], vertices(he)))
     ]
     coords_new = get_augmented_coords(id(hv), recreated_Vₕ₀; augmented_margins)
