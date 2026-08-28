@@ -2,14 +2,15 @@
 
 function read_data(
         file::String, id_colname::Symbol;
-        delim::Char = ',', groupdelim::Char = '"', superdelim::Char = ';'
+        delim::Char = ',', groupdelim::Char = '"', superdelim::Char = ';', missing_string::String = "missing"
     )
 
-    lines = readlines(file)
+    lines = readlines(file) .|>
+        x -> x[end] == ',' ? x * missing_string : x # empty columns imply missing values
 
     processed_lines = lines .|>
         x -> split_line(x, delim, groupdelim) .|>
-        x -> autoparse(x, delim, superdelim)
+        x -> autoparse(x, delim, superdelim, missing_string)
 
     header = processed_lines[1] .|> Symbol
     data = processed_lines[2:end] |> x -> reduce(hcat, x)
@@ -53,11 +54,14 @@ single_strip(s::AbstractString, chars::Vector{Char}) = [
 ] |> x -> *(x...)
 single_strip(s::AbstractString, char::Char) = single_strip(s, [char])
 
-function autoparse(line::AbstractString, delim::Char, superdelim::Char)
+function autoparse(line::AbstractString, delim::Char, superdelim::Char, missing_string::String)
     # try parsing as number or bool
     !isnothing(tryparse(Int64, line)) && return parse(Int64, line)
     !isnothing(tryparse(Float64, line)) && return parse(Float64, line)
     !isnothing(tryparse(Bool, lowercase(line))) && return parse(Bool, lowercase(line))
+
+    # parse missing strings
+    line == missing_string && return missing
 
     # don't change anything if no delimiters are present
     !(delim in line) && !(superdelim in line) && return line
@@ -67,7 +71,7 @@ function autoparse(line::AbstractString, delim::Char, superdelim::Char)
         x -> split.(x, delim) .|>
         x -> strip.(x, [[' ', '(', ')']])
 
-    return [unwrap([autoparse(_le, delim, superdelim) for _le in le]) for le in line_elements] |> unwrap
+    return [unwrap([autoparse(_le, delim, superdelim, missing_string) for _le in le]) for le in line_elements] |> unwrap
 end
 
 unwrap(x::AbstractVector) = length(x) == 1 ? unwrap(x[1]) : x

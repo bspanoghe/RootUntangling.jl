@@ -22,7 +22,7 @@ pₛ = 0.1;
 sg = get_supergraph(pg; pₛ);
 
 # plotting
-plot(sg) isa Plots.Plot
+plot(sg) isa Plot
 
 # # hypervertices
 # are ids correct

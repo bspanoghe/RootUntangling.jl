@@ -3,7 +3,9 @@ getsingularvertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(sg)[v]
 gethypervertex(Vₕ::Vector{HyperVertex{T, U}}, v::T) where {T, U} = Vₕ[findfirst(hv -> id(hv) == v, Vₕ)]
 gethypervertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? Vₕ₀(sg)[v] : Vₕ₊(sg)[-v]
 
-# get information from a singularedge that requires graph information
+# get coords from edges
+xs(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = x.(Vₕ(sg, he))
+ys(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = y.(Vₕ(sg, he))
 xs(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = x.(V(sg, se))
 ys(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = y.(V(sg, se))
 

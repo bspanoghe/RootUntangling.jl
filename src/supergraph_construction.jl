@@ -89,8 +89,6 @@ function get_hypervertex(pg::PreGraph{T, U, V}, mv::MetaVertex{T, U}, nₕs::Vec
     return HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv), vertices)
 end
 
-HyperEdge(s::Segment) = HyperEdge(vertices(s)..., width(s), pred_primary(s))
-SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
 
 # get singular vertices corresponding with a given hypervertex (containing the correct edges)
 function getsingularvertices(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
