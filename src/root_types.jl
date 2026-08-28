@@ -28,6 +28,10 @@ vertices(r::Root) = id.(V(r))
 xs(r::Root) = x.(V(r))
 ys(r::Root) = y.(V(r))
 Base.length(r::Root) = length(r.V)
+function Eₕ(r::Root)
+    root_hvs = hypervertex.(V(r))
+    return [HyperEdge(id.(root_hvs)[i], id.(root_hvs)[i-1]) for i in 2:length(root_hvs)]
+end
 
 """
     curve_length(r::Root)
@@ -79,4 +83,14 @@ function examine(rss::Vector{<:Vector{<:Root}}; digits = 2)
         println("")
     end
     return
+end
+
+function get_annotation_dict(sg::SuperGraph, rs::Vector{<:Root})
+    annotation_dict = Dict{HyperEdge, Vector{<:Integer}}()
+    for he in Eₕ₀(sg)
+        root_idxs = findall(r -> he ∈ Eₕ(r), rs)
+        annotation_dict[he] = root_idxs
+    end
+
+    return annotation_dict
 end
