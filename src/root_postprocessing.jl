@@ -46,7 +46,9 @@ function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     overlap_dict = [
         he => [r for r in roots if are_overlapping(sg, he, r) && length(r) > 2]
             for he in overlap_hes
-    ] |> Dict
+    ] |> Dict{HyperEdge, Vector{<:Root}}
+    
+    isempty(overlap_dict) && (return Dict{HyperEdge, Vector{<:Root}}())
 
     # if you have multiple edges in a connected linear path, each with the same amount of roots, only choose one edge from that path
     # reasoning: switching roots on multiple of these consecutive edges has no added effect over switching them on just one
@@ -58,7 +60,7 @@ function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
     overlap_dict_subset = [
         he => [r for r in roots if are_overlapping(sg, he, r)]
             for he in overlap_hes_subset
-    ] |> Dict
+    ] |> Dict{HyperEdge, Vector{<:Root}}
 
     return overlap_dict_subset
 end
