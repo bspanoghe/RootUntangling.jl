@@ -1,4 +1,9 @@
 function greedy_switch(sg, model, roots; max_tries = 100, f_obj::Function = roughness)
+    if isempty(find_overlaps(sg, model, roots))
+        @info "No overlaps found"
+        return roots
+    end
+
     roots_copy = deepcopy(roots)
     current_f = f_obj(roots)
     improving = true
@@ -9,7 +14,7 @@ function greedy_switch(sg, model, roots; max_tries = 100, f_obj::Function = roug
         counter > max_tries && (@info "Max tries reached"; break)
 
         overlap_dict = find_overlaps(sg, model, roots_copy)
-        switch_dict = get_switch_dict(overlap_dict, roots_copy)
+        switch_dict = get_switch_dict(overlap_dict, roots_copy)        
         n = maximum(keys(switch_dict))
 
         fs = [evaluate_objective(sg, roots_copy, f_obj, create_switches(n, i), switch_dict) for i in 1:n]
@@ -27,7 +32,7 @@ end
 
 # does a root use one of the edges of a segment
 are_overlapping(sg::SuperGraph, he::HyperEdge, r::Root) = (
-    !any([isdisjoint(vs, vertices(r)) for vs in vertices(Vₕ(sg, he))])
+    !all([isdisjoint(vs, vertices(r)) for vs in vertices(Vₕ(sg, he))])
 )
 
 # find hyperedges where multiple lateral roots overlap (and can switch)
@@ -122,7 +127,7 @@ end
 # perform a crossing over between two roots
 function switch!(sg::SuperGraph, he::HyperEdge, r1::Root, r2::Root)
     # get (not hyper) vertices of hyperedge
-    vs_he_src, vs_he_dst = vertices(Vₕ(sg, he))
+    vs_he_src, vs_he_dst = vertices.(Vₕ(sg, he)) # `.` to get separately for both hypervertices
 
     # find vertices in roots that match source of hyperedge
     src_idx1 = findfirst(v -> v in vs_he_src, vertices(r1))
