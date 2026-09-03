@@ -70,7 +70,6 @@ function differentiate_duplicates!(
 
     # make new metavertices at halfpoints of duplicates
     v_max = id.(metavertices) |> maximum
-    seg_id_max = id.(segments) |> maximum
 
     mv_new = MetaVertex{T, U}[
         MetaVertex(
@@ -86,7 +85,7 @@ function differentiate_duplicates!(
     # make new segments between startpoint and new midpoint
     seg_new = [
         Segment{T, V}(
-                seg_id_max + i,
+                id(duplicates[i]), # note: segment ids don't need to be unique
                 [vertices(duplicates[i])[1], id(mv_new[i])],
                 [f(duplicates[i]) for f in [width, pred_primary, xs, ys]]...
             )
@@ -257,6 +256,8 @@ function remove_unconnected_vertices!(metavertices, segments)
     segment_vertices = reduce(vcat, vertices.(segments))
     unconnected_vertex_idxs = findall(mv -> !any(id(mv) in segment_vertices), metavertices)
     deleteat!(metavertices, unconnected_vertex_idxs)
+    n_deleted = length(unconnected_vertex_idxs)
+    n_deleted > 0 && (@info "$(n_deleted) unconnected vertices deleted")
 
     return nothing
 end
