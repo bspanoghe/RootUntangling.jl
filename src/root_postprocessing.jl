@@ -1,4 +1,6 @@
-function greedy_switch(sg, model, roots; max_tries = 100, f_obj::Function = roughness)
+function greedy_switch(sg::SuperGraph, model::JuMP.Model, roots::Vector{<:Root};
+        max_tries = 100, f_obj::Function = roughness
+    )
     if isempty(find_overlaps(sg, model, roots))
         @info "No overlaps found"
         return roots
@@ -14,7 +16,7 @@ function greedy_switch(sg, model, roots; max_tries = 100, f_obj::Function = roug
         counter > max_tries && (@info "Max tries reached"; break)
 
         overlap_dict = find_overlaps(sg, model, roots_copy)
-        switch_dict = get_switch_dict(overlap_dict, roots_copy)        
+        switch_dict = get_switch_dict(overlap_dict, roots_copy)      
         n = maximum(keys(switch_dict))
 
         fs = [evaluate_objective(sg, roots_copy, f_obj, create_switches(n, i), switch_dict) for i in 1:n]
@@ -28,6 +30,14 @@ function greedy_switch(sg, model, roots; max_tries = 100, f_obj::Function = roug
     end
 
     return roots_copy
+end
+
+function greedy_switch(sg::SuperGraph, model::JuMP.Model, root_systems::Vector{<:Vector{<:Root}};
+        max_tries = 100, f_obj::Function = roughness
+    )
+    
+    roots_tangled = greedy_switch(sg, model, reduce(vcat, root_systems); max_tries, f_obj)
+    return separate_root_systems(sg, get_se_classification_dict(sg, model), roots_tangled)
 end
 
 # does a root use one of the edges of a segment
