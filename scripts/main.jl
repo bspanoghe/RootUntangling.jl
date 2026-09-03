@@ -8,7 +8,12 @@ using Dates, Statistics
 ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-directory = "validation/baby"
+
+playground_dir = "playground"
+difficulty = "baby"
+validation_dir = "validation/$(difficulty)"
+
+directory = validation_dir
 roi_nr = 1
 
 # read data
@@ -23,50 +28,64 @@ begin
 
     filename_segments = "./data/$(directory)/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "./data/$(directory)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
+    sg_full = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
 
-    hypothesis_plot(sg)
+    hypothesis_plot(sg_full)
 end
 
 begin
-    sgs = get_subgraphs(sg; pₛ, nₕ_min) |>
-        sgs -> filter(x -> length(x) > 15, sgs) |>
+    min_vertices = 5
+    y_threshold = 1000
+
+    sgs = get_subgraphs(sg_full; pₛ, nₕ_min) |>
+        sgs -> filter(sg -> length(sg) > min_vertices, sgs) |>
+        sgs -> filter(sg -> minimum(y.(Vₕ₀(sg))) > y_threshold, sgs) |>
         sgs -> sort(sgs, by = sg -> mean(x.(Vₕ₀(sg))));
 
     f_multi = Figure()
     ax_multi = Axis(f_multi[1, 1]; aspect = DataAspect())
-    for (i, sg) in enumerate(sgs)
+    
+    ls = [
         lines!(ax_multi, sg, Eₕ₀(sg), color = Makie.HSV(i / length(sgs) * 360, 1, 1))
-    end
+        for (i, sg) in enumerate(sgs)
+    ]
+    Legend(f_multi[1, 2], ls, string.(1:length(ls)))
+
     f_multi
 end
 
-for subidx in eachindex(sgs)
-    sg = sgs[subidx]
-    f_ann = annotation_plot(sg, size = (2400, 2000))
-    save("results/$(directory)/ROI_$(roi_nr)_$(subidx).svg", f_ann)
+annotating = true
+if annotating
+    root_systems = get_root_systems(sgs, ones(Int64, length(sgs)), optimizer = Gurobi.Optimizer,
+        time_limit = 13*60, hotstart_time = 2*60, ρₒ_base = 4.0
+    )
+
+    f_ann = annotation_plot(sg_full, root_systems, size = (3200, 1800))
+    save("results/$(directory)/ROI_$(roi_nr).svg", f_ann)
+    write_annotation("results/$(directory)/ROI_$(roi_nr).txt", sg_full, sgs, root_systems)
 end
 
-model, time = @timed solve_rsa(
-    sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 60, hotstart_time = 60,
-    num_roots = 1, ρₐ = 0.01, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = 4.0
-)
+f_ann = annotation_plot(sg_full, root_systems, size = (1600, 900))
 
-roots = get_roots(sg, model);
-graphplot(sg, get_he_classification_dict(sg, model))
-r = rootplot(roots, height = 800, width = 600, title = "Time: $(round(time / 60, digits = 1)) min")
-examine(roots)
+subidx = 1
+sg = sgs[subidx]
+hypothesis_plot(sg)
 
-save(homedir() * "/Downloads/test.png", r)
-save("results/roi$(roi_nr)_roots_$(today).png", r)
+begin
+    model, time = @timed solve_rsa(
+        sg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 60, hotstart_time = 60,
+        num_roots = 1, ρₒ_base = 4.0
+    )
 
-annotation_dict = RootUntangling.get_annotation_dict(sg, roots)
-RootUntangling.annotation_plot(sg, annotation_dict)
+    roots = get_roots(sg, model);
+    roots_new = greedy_switch(sg, model, roots)
+end
 
-plot(roots, size = (800, 800), title = "Time: $(round(time / 60, digits = 1)) min", lw = 1)
-savefig("results/roi$(roi_nr)-$(subidx)_roots_$(today).svg")
+r1 = rootplot(roots, size = (600, 600), title = "Time: $(round(time / 60, digits = 1)) min")
+r2 = rootplot(roots_new, size = (600, 600), title = "Time: $(round(time / 60, digits = 1)) min")
 
-examine(roots)
+save(homedir() * "/Downloads/test1.svg", r1)
+save(homedir() * "/Downloads/test2.svg", r2)
 
 # NN predictions
 
@@ -78,23 +97,6 @@ plot(
 savefig(homedir() * "\\Downloads\\wa.svg")
 
 # testing grounds
-
-
-## does greedy search work
-isdefined(Main, :sgs) && (sg = sgs[subidx]);
-begin
-    roots = get_roots(sg, model)
-    roots_improved = greedy_switch(sg, model, roots; max_tries = 100)
-
-    p_before = plot(roots, size = (1000, 800), title = "Total roughness: $(roughness(roots))")
-    p_after = plot(roots_improved, title = "Total roughness: $(roughness(roots_improved))")
-    plot(p_before, p_after)
-end
-savefig(homedir() * "/Downloads/tortitup.svg")
-
-
-
-
 
 points = Observable(Point2f[])
 
