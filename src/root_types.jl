@@ -84,13 +84,3 @@ function examine(rss::Vector{<:Vector{<:Root}}; digits = 2)
     end
     return
 end
-
-function get_annotation_dict(sg::SuperGraph, rs::Vector{<:Root})
-    annotation_dict = Dict{HyperEdge, Vector{<:Integer}}()
-    for he in Eₕ₀(sg)
-        root_idxs = findall(r -> he ∈ Eₕ(r), rs)
-        annotation_dict[he] = root_idxs
-    end
-
-    return annotation_dict
-end

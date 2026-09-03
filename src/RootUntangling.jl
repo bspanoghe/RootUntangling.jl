@@ -3,9 +3,10 @@ module RootUntangling
 export SuperGraph, get_supergraph # data to graph
 export get_subgraphs # separate graphs
 export solve_rsa # solving
-export Root, get_roots, examine, curve_length # get and examine roots
+export Root, get_roots, get_root_systems, examine, curve_length # get and examine roots
 export greedy_switch, roughness # postprocess roots
 export graphplot, rootplot, hypothesis_plot, annotation_plot # plotting
+export get_annotation_dict, write_annotation # write output
 # debugging exports
 export read_data, get_edge_info, get_vertex_info # data reading
 export get_pregraph # data to graph
@@ -30,5 +31,6 @@ include("root_types.jl"); # type to represent resulting roots
 include("root_construction.jl"); # get the roots
 include("root_postprocessing.jl"); # postprocessing on roots
 include("plotting.jl"); # visualisation
+include("annotation.jl"); # annotate graphs with root identities
 
 end
