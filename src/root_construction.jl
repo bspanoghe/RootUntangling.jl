@@ -68,7 +68,7 @@ function correct_polarity!(sg::SuperGraph, polarity_classification_dict::Dict, r
 end
 
 # divide roots into separate root systems
-function separate_root_systems(sg::SuperGraph, se_classification_dict::Dict, rs::Vector{Root})
+function separate_root_systems(sg::SuperGraph, se_classification_dict::Dict, rs::Vector{<:Root})
     primary_roots = filter(is_primary, rs)
     lateral_roots = filter(!is_primary, rs)
     root_systems = [[pr] for pr in primary_roots]
