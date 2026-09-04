@@ -133,7 +133,7 @@ function solve_rsa(
         # It is an active primary vertex ⇔ it is connected to two active primary edges
         @constraint(model, 2 * vp2f[v] == sum(ep2f[e] for e in E(v)))
         # It has an incoming and an outgoing edge
-        @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e])) * polarity(e, v) for e in E(v)) == 0)
+        @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e])) * direction(e, v) for e in E(v)) == 0)
 
         # It is active ⇔ It has one active connection
         add_momentum && @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))

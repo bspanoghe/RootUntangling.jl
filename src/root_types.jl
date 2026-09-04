@@ -12,7 +12,7 @@ struct Root{T, U}
     V::Vector{SingularVertex{T, U}}
 end
 function Root(
-        se::SingularEdge{T, U}, se_classification_dict::Dict{SingularEdge{T, U}, Complex{Int64}},
+        se::SingularEdge{T}, se_classification_dict::Dict{SingularEdge{T}, Complex{Int64}},
         sg::SuperGraph{T, U}
     ) where {T, U}
     @assert haskey(se_classification_dict, se)

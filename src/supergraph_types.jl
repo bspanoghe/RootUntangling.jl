@@ -1,3 +1,8 @@
+# # ids
+is_augmented(v::Integer) = v < 0
+polarity(v::Integer) = isodd(v) ? 1 : -1
+roommate(v::Integer) = isodd(v) ? v+1 : v-1
+
 # # edges
 abstract type AbstractEdge{T} end
 src(ae::AbstractEdge) = ae.src
@@ -15,7 +20,7 @@ Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.n
 """
     HyperEdge{T, U}
 
-Represents a segment from a root scan, which may contain one or multiple roots.
+Represents a segment from a root scan, which may contain roots going in either direction.
 """
 struct HyperEdge{T, U} <: AbstractEdge{T}
     src::T
@@ -35,24 +40,31 @@ pred_primary(he::HyperEdge) = he.pred_primary
 HyperEdge(src::T, dst::T) where {T} = HyperEdge(src, dst, 0, NaN, NaN)
 HyperEdge(s::Segment) = HyperEdge(vertices(s)..., id(s), width(s), pred_primary(s))
 
-
 """
-    SingularEdge{T, U}
+    SingularEdge{T}
 
-Represents an edge in between two vertices of different hypervertices.
+Represents a segment from a root scan, with roots going in one set direction.
 """
-struct SingularEdge{T, U} <: AbstractEdge{T}
+abstract type SingularEdge{T} <: AbstractEdge{T} end
+polarity(se::SingularEdge) = polarity(src(se))
+
+struct InterEdge{T, U} <: SingularEdge{T}
     src::T
     dst::T
     hyperedge::HyperEdge{T, U}
 
-    SingularEdge(src::T, dst::T, hyperedge::HyperEdge{T, U}) where {T, U} = (
-        new{T, U}(sort([src, dst])..., hyperedge)
+    InterEdge(src::T, dst::T, he::HyperEdge{T, U}) where {T, U} = (
+        new{T, U}(sort([src, dst])..., he)
     )
 end
-hyperedge(se::SingularEdge) = se.hyperedge
+hyperedge(ie::InterEdge) = ie.hyperedge
 
-SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
+struct IntraEdge{T} <: SingularEdge{T}
+    src::T
+    dst::T
+end
+
+# SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
 
 # vertices
 abstract type AbstractVertex{T, U} end
@@ -80,6 +92,7 @@ struct HyperVertex{T, U} <: AbstractVertex{T, U}
         new{T, U}(id, sort(edges, by = e -> src(e)), x, y, pred_split, sort(vertices))
     )
 end
+HyperVertex(id, edges, x, y, pred_split) = HyperVertex(id, edges, x, y, pred_split, [roommate(2*id), 2*id])
 
 x(hv::HyperVertex) = hv.x
 y(hv::HyperVertex) = hv.y
@@ -93,20 +106,20 @@ vertices(hvs::Vector{<:HyperVertex}) = reduce(vcat, vertices.(hvs))
 """
     SingularVertex{T, U}
 
-Represents a point on a single root.
+Represents a branchpoint or endpoint of a segment in the image for a given direction.
 """
 struct SingularVertex{T, U} <: AbstractVertex{T, U}
     id::T
-    edges::Vector{SingularEdge{T, U}}
+    edges::Vector{SingularEdge{T}}
     hypervertex::HyperVertex{T, U}
 
-    SingularVertex(id::T, edges::Vector{SingularEdge{T, U}}, hypervertex::HyperVertex{T, U}) where {T, U} = (
-        new{T, U}(id, sort(edges, by = e -> src(e)), hypervertex)
+    SingularVertex(id::T, ses::Vector{SingularEdge{T}}, hv::HyperVertex{T, U}) where {T, U} = (
+        new{T, U}(id, sort(ses, by = e -> src(e)), hv)
     )
 end
 hypervertex(sv::SingularVertex) = sv.hypervertex
 
-is_augmented(v::T) where {T} = v < 0
+polarity(sv::SingularVertex) = polarity(id(sv))
 is_augmented(sv::SingularVertex) = is_augmented(id(sv))
 x(sv::SingularVertex) = x(hypervertex(sv))
 y(sv::SingularVertex) = y(hypervertex(sv))
@@ -129,10 +142,10 @@ struct SuperGraph{T, U}
 
     Eₕ₀::Vector{HyperEdge{T}}
     Eₕ₊::Vector{HyperEdge{T}}
-    E₀::Vector{SingularEdge{T, U}}
-    E₊::Vector{SingularEdge{T, U}}
+    E₀::Vector{SingularEdge{T}}
+    E₊::Vector{SingularEdge{T}}
 
-    he2e::Dict{HyperEdge{T}, Vector{SingularEdge{T, U}}}
+    he2e::Dict{HyperEdge{T}, Vector{SingularEdge{T}}}
     function SuperGraph(
             Vₕ₀::Vector{HyperVertex{T, U}}, Vₕ₊::Vector{HyperVertex{T, U}},
             V₀::Vector{SingularVertex{T, U}}, V₊::Vector{SingularVertex{T, U}}
@@ -158,7 +171,7 @@ struct SuperGraph{T, U}
 
         # precompute mappings
         he2e = Dict([
-            he => unique([e for e in [E₀; E₊] if hyperedge(e) == he])
+            he => unique([e for e in [E₀; E₊] if e isa InterEdge && hyperedge(e) == he])
             for he in [Eₕ₀; Eₕ₊]
         ])
 
@@ -193,7 +206,7 @@ E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[
 E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]
 
 # additional methods using mathematical syntax of V / V₀ / Vₕ / Vₕ₀ and E / E₀ / Eₕ / Eₕ₀
-V(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
+V(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
 V(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(hv)]
 Vₕ(sv::SingularVertex) = hypervertex(sv)
 Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(Vₕ(sg), v) for v in vertices(he)]

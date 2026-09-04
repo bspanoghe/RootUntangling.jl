@@ -6,8 +6,8 @@ gethypervertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? Vₕ₀(sg)[v]
 # get coords from edges
 xs(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = x.(Vₕ(sg, he))
 ys(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = y.(Vₕ(sg, he))
-xs(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = x.(V(sg, se))
-ys(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = y.(V(sg, se))
+xs(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = x.(V(sg, se))
+ys(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = y.(V(sg, se))
 
 # get neighbors
 neighbor(hv::HyperVertex{T, U}, he::HyperEdge{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = (
@@ -24,9 +24,9 @@ neighbors(sg::SuperGraph{T, U}, av::AbstractVertex{T, U}) where {T, U} = [neighb
 inner_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) > 1]
 outer_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) == 1]
 
-# polarity
-polarity(se::SingularEdge{T, U}, sv::SingularVertex{T, U}) where {T, U} = src(se) == id(sv) ? 1 : -1
-polarity(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id(sv1) < id(sv2) ? 1 : -1
+# direction
+direction(se::SingularEdge{T}, sv::SingularVertex{T, U}) where {T, U} = src(se) == id(sv) ? polarity(se) : -polarity(se)
+direction(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id(sv1) < id(sv2) ? 1 : -1
 
 # angles
 angle(hv1::HyperVertex{T, U}, hv2::HyperVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
@@ -35,7 +35,7 @@ angle(hv1::HyperVertex{T, U}, hv2::HyperVertex{T, U}; reverse_order::Bool = fals
 angle(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
     angle(hypervertex(sv1), hypervertex(sv2); reverse_order)
 )
-angle(sg::SuperGraph{T, U}, se::SingularEdge{T, U}; reverse_order::Bool = false) where {T, U} = (
+angle(sg::SuperGraph{T, U}, se::SingularEdge{T}; reverse_order::Bool = false) where {T, U} = (
     vertices(se) .|> (v -> getsingularvertex(sg, v)) .|> hypervertex |> hvs -> angle(hvs...; reverse_order)
 )
 angle(sg::SuperGraph{T, U}, he::HyperEdge{T, U}; reverse_order::Bool = false) where {T, U} = (

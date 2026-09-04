@@ -72,46 +72,6 @@ function graphplot(
     return graphplot(sg; augmented_alpha, size, edge_kwargs, vertex_kwargs, kwargs...)
 end
 
-# ### With num_hypotheses classification
-"""
-    hypothesis_plot(sg::SuperGraph)
-
-Visualise the maximum allowed number of roots per segment of a graph.
-"""
-function hypothesis_plot(sg::SuperGraph; size = (600, 400), kwargs...)
-    f = Figure(; size)
-    ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-
-    nₕs = [
-        maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
-            for he in Eₕ₀(sg)
-    ]
-    ΔH = 360 / (maximum(nₕs) + 1)
-
-    hue(i, ΔH) = ΔH * i
-    edge_kwargs = Dict(
-        :linewidth => [
-            fill(nₕ == 1 ? 3 : width(he) / 2, 3)
-            for (he, nₕ) in zip(Eₕ₀(sg), nₕs)
-        ] |> x -> reduce(vcat, x),
-        :color => [
-            fill(HSVA(hue(nₕ, ΔH), 1, 0.75, alpha(he, 1.0, 0.0)), 3)
-            for (he, nₕ) in zip(Eₕ₀(sg), nₕs)
-        ] |> x -> reduce(vcat, x),
-    )
-
-    lines!(ax, sg, Eₕ₀(sg); edge_kwargs...)
-    label_lines = [lines!(ax, NaN, NaN, color = HSV(hue(i, ΔH), 1, 0.75)) for i in 1:maximum(nₕs)]
-    Legend(
-        f[1, 2],
-        label_lines,
-        string.(1:maximum(nₕs))
-    )
-
-    return f
-end
-
-
 # ### With annotation classification
 function add_annotation!(ax::Makie.Axis, sg::SuperGraph, hes::Vector{<:HyperEdge}; fontsize)
     annotation_coords = [(mean(xs(sg, he)), mean(ys(sg, he))) for he in hes]

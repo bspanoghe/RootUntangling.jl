@@ -33,11 +33,11 @@ function get_roots(sg::SuperGraph, model::JuMP.Model)
     end
 end
 
-are_connected(r::Root{T, U}, se::SingularEdge{T, U}) where {T, U} = (
+are_connected(r::Root{T, U}, se::SingularEdge{T}) where {T, U} = (
     !isempty(intersect(vertices(r)[[1, end]], vertices(se)))
 )
 
-function grow!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U}) where {T, U}
+function grow!(r::Root{T, U}, se::SingularEdge{T}, sg::SuperGraph{T, U}) where {T, U}
     new_vertex_idx = findfirst(x -> !(x in vertices(r)[[1, end]]), vertices(se))
     if isnothing(new_vertex_idx)
         @warn "Loop found in root"

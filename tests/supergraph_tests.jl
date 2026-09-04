@@ -7,9 +7,9 @@ pg = PreGraph(
     [-1, 1, 2, 3, 4],
     [
         [Segment(i, [-1, i]) for i in 1:4];
-        Segment(5, [1, 2], 1.0, false);
-        Segment(6, [2, 3], 1.0, false);
-        Segment(7, [2, 4], 1.0, false);
+        Segment(5, [1, 2]);
+        Segment(6, [2, 3]);
+        Segment(7, [2, 4]);
     ],
     Dict(
         [
@@ -18,11 +18,10 @@ pg = PreGraph(
         ]
     )
 );
-pₛ = 0.1;
-sg = get_supergraph(pg; pₛ);
+sg = get_supergraph(pg);
 
 # plotting
-plot(sg) isa Plot
+graphplot(sg) isa Figure
 
 # # hypervertices
 # are ids correct
@@ -57,7 +56,14 @@ sv = V₀(sg)[1];
 neighbors(sg, sv) isa Vector{<:SingularVertex}
 issetequal(
     id.(neighbors(sg, sv)),
-    [-1, 4, 5, 6]
+    [-1, 2, 3]
+)
+
+sv = V(sg, Vₕ₀(sg)[2])[2];
+neighbors(sg, sv) isa Vector{<:SingularVertex}
+issetequal(
+    id.(neighbors(sg, sv)),
+    [-1, 2, 3, 6, 8]
 )
 
 sv = V₊(sg)[1];
@@ -83,11 +89,11 @@ isdisjoint(E₀(sg), E₊(sg))
 isdisjoint(Eₕ₀(sg), Eₕ₊(sg))
 
 # do singular edges map to the correct hyperedges
-vₕ₁, vₕ₂ = Vₕ₀(sg)[[1, 2]];
-he = Eₕ(sg)[findfirst(he -> issetequal(vertices(he), (id(vₕ₁), id(vₕ₂))), Eₕ(sg))];
-es = E(sg, he);
-vs = [getsingularvertex(sg, v) for e in es for v in vertices(e)];
-all(hypervertex.(vs) .∈ [[vₕ₁, vₕ₂]])
+hv1, hv2 = Vₕ₀(sg)[[1, 2]];
+he = Eₕ(sg)[findfirst(he -> issetequal(vertices(he), (id(hv1), id(hv2))), Eₕ(sg))]; # he between hvs
+es = E(sg, he); # singular edges of he
+svs = [getsingularvertex(sg, v) for e in es for v in vertices(e)]; # singular vertices of ses
+all(hypervertex.(svs) .∈ [[hv1, hv2]])
 
 # do all vertices have a unique set of edges
 [allunique(E(v)) for v in V(sg)] |> all
@@ -106,17 +112,14 @@ isapprox(cosine_similarity(sg, hes..., 2), 0.0, atol = 1.0e-12)
 connections = E₂(sg);
 allunique(connections)
 
-v = V₀(sg)[1];
+sv = V₀(sg)[1];
 issetequal(
     [
-        vertices.(c) for c in E₂(v)
+        vertices.(c) for c in E₂(sv)
     ] .|> sort,
     [
-        [(-1, 1), (1, 4)],
-        [(-1, 1), (1, 5)],
-        [(-1, 1), (1, 6)],
-        [(1, 4), (1, 5)],
-        [(1, 4), (1, 6)],
-        [(1, 5), (1, 6)],
+        [(-1, 1), (1, 2)],
+        [(-1, 1), (1, 3)],
+        [(1, 2), (1, 3)],
     ] .|> sort
 )

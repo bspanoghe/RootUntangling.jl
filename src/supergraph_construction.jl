@@ -26,7 +26,7 @@ For the file containing edge/segment information.
 """
 function get_supergraph(
         filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1,
+        dist_threshold::Real, reverse_y::Bool,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
         x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
         segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
@@ -38,72 +38,60 @@ function get_supergraph(
         segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
         dist_colname, primary_score_colname, coords_colname
     )
-    sg = get_supergraph(pg; pₛ, nₕ_min)
+    sg = get_supergraph(pg)
 
     return sg
 end
 
-function get_supergraph(pg::PreGraph; pₛ, nₕ_min)
-    all_widths = [width(s) for s in segments(pg) if !isspecial(s)]
-    single_width = quantile(all_widths, pₛ)
-    nₕs = [get_num_hypotheses(pg, mv, single_width; nₕ_min) for mv in getmetavertices(pg) if !isspecial(mv)]
-
+function get_supergraph(pg::PreGraph)
     Vₕ₀ = [
-        get_hypervertex(pg, mv, nₕs, i)
-            for (i, mv) in enumerate(getmetavertices(pg))
-            if !isspecial(mv)
+        HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv))
+        for mv in getmetavertices(pg)
+        if !isspecial(mv)
     ]
     Vₕ₊ = [
         HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), NaN, [id(mv)])
-            for mv in getmetavertices(pg)
-            if isspecial(mv)
+        for mv in getmetavertices(pg)
+        if isspecial(mv)
     ]
-    V₀ = (
+    V₀ = [
         [
-            getsingularvertices(hv, [Vₕ₀; Vₕ₊])
-                for hv in Vₕ₀
-        ] |> x -> reduce(vcat, x)
-    )
-    V₊ = [
-        getsingularvertices(hv, [Vₕ₀; Vₕ₊])
-            for hv in Vₕ₊
+            SingularVertex(v, getsingularedges(v, hv, [Vₕ₀; Vₕ₊]), hv)
+            for v in vertices(hv)
+        ]
+        for hv in Vₕ₀
     ] |> x -> reduce(vcat, x)
+    V₊ = [
+        SingularVertex(id(hv), getsingularedges(hv, [Vₕ₀; Vₕ₊]), hv)
+        for hv in Vₕ₊
+    ]
 
     return SuperGraph(Vₕ₀, Vₕ₊, V₀, V₊)
 end
 
-# get amount of hypotheses corresponding to a metavertex
-function get_num_hypotheses(pg::PreGraph, mv::MetaVertex, single_width::Number; nₕ_min)
-    return [nₕ_min + floor(Int64, width(s)/single_width) for s in segments(pg, mv) if !isspecial(s)] |> maximum
+# standard vertices
+function getsingularedges(v::T, hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
+    interedges = [
+        [
+            InterEdge(v, v_nb, he)
+            for v_nb in vertices(neighbor(hv, he, Vₕ))
+            if polarity(v_nb) == polarity(v) || is_augmented(v_nb)
+        ]
+        for he in edges(hv)
+    ] |> x -> reduce(vcat, x)
+
+    intraedge = IntraEdge(v, roommate(v))
+
+    return SingularEdge{T}[interedges; intraedge]
 end
 
-function get_num_hypotheses(hv::HyperVertex, single_width::Number; nₕ_min)
-    return [nₕ_min + floor(Int64, width(he)/single_width) for he in edges(hv) if !is_augmented(he)] |> maximum
-end
-
-# instantiate a hypervertex based on a metavertex
-function get_hypervertex(pg::PreGraph{T, U, V}, mv::MetaVertex{T, U}, nₕs::Vector{<:Integer}, i::Integer) where {T, U, V}
-    prev_id = sum(nₕs[1:(i - 1)]) # amount of vertices that have been defined in previous hypervertices
-    vertices = collect(prev_id .+ (1:nₕs[i]))
-
-    return HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv), vertices)
-end
-
-
-# get singular vertices corresponding with a given hypervertex (containing the correct edges)
-function getsingularvertices(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
+# augmented vertices
+function getsingularedges(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
     return [
-        SingularVertex(
-                v,
-                [
-                    SingularEdge{T, U}[
-                        SingularEdge(v, v_nb, he)
-                        for v_nb in vertices(neighbor(hv, he, Vₕ))
-                    ]
-                    for he in edges(hv)
-                ] |> x -> reduce(vcat, x, init = SingularEdge{T, U}[]),
-                hv
-            )
-            for v in vertices(hv)
-    ]
+        SingularEdge{T}[
+            InterEdge(id(hv), v_nb, he)
+            for v_nb in vertices(neighbor(hv, he, Vₕ))
+        ]
+        for he in edges(hv)
+    ] |> x -> reduce(vcat, x)
 end
