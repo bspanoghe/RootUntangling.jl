@@ -63,8 +63,8 @@ function autoparse(line::AbstractString, delim::Char, superdelim::Char, missing_
     # parse missing strings
     line == missing_string && return missing
 
-    # don't change anything if no delimiters are present
-    !(delim in line) && !(superdelim in line) && return line
+    # only strip parentheses if no delimiters are present
+    !(delim in line) && !(superdelim in line) && return strip(line, ['(', ')'])
 
     # line with delimiters gets split into elements, each of which are attempted to be parsed again
     line_elements = split(line, superdelim) |>
