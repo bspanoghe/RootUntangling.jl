@@ -10,6 +10,11 @@ xs(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = x.(V(sg, se))
 ys(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = y.(V(sg, se))
 
 # get neighbors
+function roommate(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
+    is_augmented(sv) && error("Augmented vertices have no roommates")
+    return V₀(sg)[roommate(id(sv))]
+end
+
 neighbor(hv::HyperVertex{T, U}, he::HyperEdge{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = (
     vertices(he)[findfirst(v -> v != id(hv), vertices(he))] |> (v -> gethypervertex(Vₕ, v))
 )
@@ -19,13 +24,20 @@ neighbor(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}, se::SingularEdge{T}) wh
 neighbor(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}, he::HyperEdge{T}) where {T, U} = (
     vertices(he)[findfirst(v -> v != id(hv), vertices(he))] |> v -> gethypervertex(sg, v)
 )
-neighbors(sg::SuperGraph{T, U}, av::AbstractVertex{T, U}) where {T, U} = [neighbor(sg, av, ae) for ae in edges(av)]
+neighbors(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [neighbor(sg, hv, he) for he in edges(hv)]
+function neighbors(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
+    nbs = [neighbor(sg, sv, se) for se in externaledges(sv)]
+    is_augmented(sv) || (push!(nbs, roommate(sg, sv)))
+    return nbs
+end
+
 
 inner_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) > 1]
 outer_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) == 1]
 
 # direction
-direction(se::SingularEdge{T}, sv::SingularVertex{T, U}) where {T, U} = src(se) == id(sv) ? polarity(se) : -polarity(se)
+direction(sv::SingularVertex{T, U}, ee::ExternalEdge{T}) where {T, U} = src(ee) == id(sv) ? polarity(ee) : -polarity(ee)
+direction(sv::SingularVertex{T, U}, ie::InternalEdge{T}) where {T, U} = src(ie) == id(sv) ? 1 : -1
 direction(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id(sv1) < id(sv2) ? 1 : -1
 
 # angles

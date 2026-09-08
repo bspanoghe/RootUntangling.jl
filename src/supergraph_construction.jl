@@ -56,13 +56,16 @@ function get_supergraph(pg::PreGraph)
     ]
     V₀ = [
         [
-            SingularVertex(v, getsingularedges(v, hv, [Vₕ₀; Vₕ₊]), hv)
+            SingularVertex(
+                v, get_externaledges(v, hv, [Vₕ₀; Vₕ₊]), 
+                [InternalEdge(v, roommate(v)), InternalEdge(roommate(v), v)], hv
+            )
             for v in vertices(hv)
         ]
         for hv in Vₕ₀
     ] |> x -> reduce(vcat, x)
     V₊ = [
-        SingularVertex(id(hv), getsingularedges(hv, [Vₕ₀; Vₕ₊]), hv)
+        SingularVertex(id(hv), get_externaledges(hv, [Vₕ₀; Vₕ₊]), InternalEdge{typeof(id(hv))}[], hv)
         for hv in Vₕ₊
     ]
 
@@ -70,26 +73,24 @@ function get_supergraph(pg::PreGraph)
 end
 
 # standard vertices
-function getsingularedges(v::T, hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
-    interedges = [
+function get_externaledges(v::T, hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
+    externaledges = [
         [
-            InterEdge(v, v_nb, he)
+            ExternalEdge(v, v_nb, he)
             for v_nb in vertices(neighbor(hv, he, Vₕ))
             if polarity(v_nb) == polarity(v) || is_augmented(v_nb)
         ]
         for he in edges(hv)
     ] |> x -> reduce(vcat, x)
 
-    intraedge = IntraEdge(v, roommate(v))
-
-    return SingularEdge{T}[interedges; intraedge]
+    return externaledges
 end
 
 # augmented vertices
-function getsingularedges(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
+function get_externaledges(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
     return [
-        SingularEdge{T}[
-            InterEdge(id(hv), v_nb, he)
+        [
+            ExternalEdge(id(hv), v_nb, he)
             for v_nb in vertices(neighbor(hv, he, Vₕ))
         ]
         for he in edges(hv)
