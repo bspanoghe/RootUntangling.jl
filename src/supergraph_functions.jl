@@ -15,14 +15,17 @@ function roommate(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
     return V₀(sg)[roommate(id(sv))]
 end
 
+neighbor(av::AbstractVertex{T, U}, ae::AbstractEdge{T}) where {T, U} = (
+    vertices(ae)[findfirst(v -> v != id(av), vertices(ae))]
+)
 neighbor(hv::HyperVertex{T, U}, he::HyperEdge{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = (
-    vertices(he)[findfirst(v -> v != id(hv), vertices(he))] |> (v -> gethypervertex(Vₕ, v))
+    gethypervertex(Vₕ, neighbor(hv, he))
 )
 neighbor(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}, se::SingularEdge{T}) where {T, U} = (
-    vertices(se)[findfirst(v -> v != id(sv), vertices(se))] |> v -> getsingularvertex(sg, v)
+    getsingularvertex(sg, neighbor(sv, se))
 )
 neighbor(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}, he::HyperEdge{T}) where {T, U} = (
-    vertices(he)[findfirst(v -> v != id(hv), vertices(he))] |> v -> gethypervertex(sg, v)
+    gethypervertex(sg, neighbor(hv, he))
 )
 neighbors(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [neighbor(sg, hv, he) for he in edges(hv)]
 function neighbors(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
@@ -30,7 +33,6 @@ function neighbors(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
     is_augmented(sv) || (push!(nbs, roommate(sg, sv)))
     return nbs
 end
-
 
 inner_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) > 1]
 outer_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) == 1]

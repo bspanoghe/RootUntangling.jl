@@ -66,6 +66,7 @@ struct InternalEdge{T} <: SingularEdge{T}
     dst::T
 end
 
+isinternal(se::SingularEdge) = se isa InternalEdge
 # SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
 
 # vertices
@@ -194,23 +195,29 @@ Eₕ₊(sg::SuperGraph) = sg.Eₕ₊
 E₀(sg::SuperGraph) = sg.E₀
 E₊(sg::SuperGraph) = sg.E₊
 
+Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
+
 E(sg::SuperGraph, he::HyperEdge) = sg.he2e[he]
 
 Vₕ(sg::SuperGraph) = [Vₕ₊(sg); Vₕ₀(sg)]
 V(sg::SuperGraph) = [V₊(sg); V₀(sg)]
 Eₕ(sg::SuperGraph) = [Eₕ₊(sg); Eₕ₀(sg)]
 E(sg::SuperGraph) = [E₊(sg); E₀(sg)]
+internaledges(sg::SuperGraph) = internaledges.(V₀(sg))
 
-Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
-
-E₂(sv::SingularVertex) = [
-    [edges(sv)[i], edges(sv)[j]]
-        for i in eachindex(edges(sv)) for j in eachindex(edges(sv))
-        if (i > j) && !all(is_augmented.(edges(sv)[[i, j]])) &&
-            !all(isa.(edges(sv)[[i, j]], InternalEdge))
+E₂(sv::SingularVertex) = edges(sv) |> es -> [
+    [es[i], es[j]]
+    for i in 1:length(es) for j in i+1:length(es)
+    if !all(is_augmented.(es[[i, j]])) &&
+        !all(isinternal.(es[[i, j]]))
 ]
 E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[])
-E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]
+E₂(sg::SuperGraph, se::SingularEdge) = [
+    [se, nb_se]
+    for nb_se in unique(reduce(vcat, edges.(V(sg, se))))
+    if nb_se != se
+]
+E₂(sv::SingularVertex, se::SingularEdge) = filter(c -> se in c, E₂(sv))
 
 # additional methods using mathematical syntax of V / V₀ / Vₕ / Vₕ₀ and E / E₀ / Eₕ / Eₕ₀
 V(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
