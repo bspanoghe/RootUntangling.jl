@@ -108,7 +108,8 @@ es = filter(e -> e isa InternalEdge, edges(sv))
     [1, -1]
 )
 
-
+sv = V₊(sg)[1]
+@test all([direction(sv, e) == 1 for e in edges(sv)])
 
 # are edges sorted
 for edge_set in [E(sg), E₀(sg), E₊(sg), Eₕ(sg), Eₕ₀(sg), Eₕ₊(sg)]
