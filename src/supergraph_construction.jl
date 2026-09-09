@@ -38,61 +38,22 @@ function get_supergraph(
         segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
         dist_colname, primary_score_colname, coords_colname
     )
-    sg = get_supergraph(pg)
+    rg = get_supergraph(pg)
 
-    return sg
+    return rg
 end
 
 function get_supergraph(pg::PreGraph)
-    Vₕ₀ = [
-        HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv))
+    V₀ = [
+        RootVertex(id(mv), RootEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv))
         for mv in getmetavertices(pg)
         if !isspecial(mv)
     ]
-    Vₕ₊ = [
-        HyperVertex(id(mv), HyperEdge.(segments(pg, mv)), x(mv), y(mv), NaN, [id(mv)])
+    V₊ = [
+        RootVertex(id(mv), RootEdge.(segments(pg, mv)), x(mv), y(mv), NaN)
         for mv in getmetavertices(pg)
         if isspecial(mv)
     ]
-    V₀ = [
-        [
-            SingularVertex(
-                v, get_externaledges(v, hv, [Vₕ₀; Vₕ₊]), 
-                [InternalEdge(v, roommate(v)), InternalEdge(roommate(v), v)], hv
-            )
-            for v in vertices(hv)
-        ]
-        for hv in Vₕ₀
-    ] |> x -> reduce(vcat, x)
-    V₊ = [
-        SingularVertex(id(hv), get_externaledges(hv, [Vₕ₀; Vₕ₊]), InternalEdge{typeof(id(hv))}[], hv)
-        for hv in Vₕ₊
-    ]
 
-    return SuperGraph(Vₕ₀, Vₕ₊, V₀, V₊)
-end
-
-# standard vertices
-function get_externaledges(v::T, hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
-    externaledges = [
-        [
-            ExternalEdge(v, v_nb, he)
-            for v_nb in vertices(neighbor(hv, he, Vₕ))
-            if polarity(v_nb) == polarity(v) || is_augmented(v_nb)
-        ]
-        for he in edges(hv)
-    ] |> x -> reduce(vcat, x)
-
-    return externaledges
-end
-
-# augmented vertices
-function get_externaledges(hv::HyperVertex{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U}
-    return [
-        [
-            ExternalEdge(id(hv), v_nb, he)
-            for v_nb in vertices(neighbor(hv, he, Vₕ))
-        ]
-        for he in edges(hv)
-    ] |> x -> reduce(vcat, x)
+    return RootGraph(V₀, V₊)
 end

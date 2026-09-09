@@ -1,6 +1,6 @@
 module RootUntangling
 
-export SuperGraph, get_supergraph # data to graph
+export RootGraph, get_supergraph # data to graph
 export get_subgraphs # separate graphs
 export solve_rsa # solving
 export Root, get_roots, get_root_systems, examine, curve_length # get and examine roots
@@ -12,8 +12,8 @@ export read_data, get_edge_info, get_vertex_info # data reading
 export get_pregraph # data to graph
 export src, dst, vertices, hyperedge, segment_id, width, pred_primary, is_augmented, are_connected # edges
 export id, edges, x, y, pred_split, xs, ys, hypervertex # vertices
-export Vₕ₀, Vₕ₊, V₀, V₊, Vₕ, V, Eₕ₀, Eₕ₊, E₀, E₊, Eₕ, E, E₂, neighbors # graphs
-export get_he_classification_dict, get_se_classification_dict, get_hv_classification_dict, get_sv_classification_dict # get results
+export V₀, Vₕ₊, V₀, V₊, Vₕ, V, Eₕ₀, Eₕ₊, E₀, E₊, Eₕ, E, E₂, neighbors # graphs
+export get_re_classification_dict, get_re_classification_dict, get_rv_classification_dict, get_rv_classification_dict # get results
 
 using JuMP, Statistics, GLMakie, GLMakie.Colors
 

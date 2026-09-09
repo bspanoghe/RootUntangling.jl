@@ -1,10 +1,10 @@
 """
     solve_rsa(
-        sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        rg::RootGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.95, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi/2, ϵ = 1e-5
     )
 
-Solve which root system architecture is represented by the graph `sg`.
+Solve which root system architecture is represented by the graph `rg`.
 
 The problem is formulated as a Integer Quadratic Program (IQP) written to allow Integer Linear Program (ILP) solvers.
 
@@ -24,7 +24,7 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
 function solve_rsa(
-        sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        rg::RootGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = exp(1),
         α_down = -pi / 2, ϵ = 1e-3
     )
@@ -32,22 +32,22 @@ function solve_rsa(
     @assert ρₒ_base >= 1 "The base for the overlap probability must be greater or equal than 1."
 
     # check for NN prediction data #! remove for final version
-    NN_pred = pred_primary(Eₕ₀(sg)[1]) |> !ismissing
+    NN_pred = pred_primary(Eₕ₀(rg)[1]) |> !ismissing
 
     # name special vertices
-    vₐ = V₊(sg)[1]
-    vₑ = V₊(sg)[2] # extinction == disappearance
-    vₛ = V₊(sg)[3]
+    vₐ = V₊(rg)[1]
+    vₑ = V₊(rg)[2] # extinction == disappearance
+    vₛ = V₊(rg)[3]
 
     # define model
     model = Model(optimizer)
 
     # define the model variables
-    connections = E₂(sg)
+    connections = E₂(rg)
 
-    n_v = length(V₀(sg))
-    n_e = length(E(sg))
-    n_he = length(Eₕ₀(sg))
+    n_v = length(V₀(rg))
+    n_e = length(E(rg))
+    n_re = length(Eₕ₀(rg))
     add_momentum && (n_c = length(connections))
 
     @variable(model, va[1:n_v], Bin) # is vertex active (part of the root)
@@ -60,21 +60,21 @@ function solve_rsa(
 
     add_momentum && @variable(model, f[1:n_c], Bin) # are these edges part of the same root
 
-    @variable(model, he[1:n_he], Bin) # is this hyperedge active
-    NN_pred && @variable(model, heₚ[1:n_he], Bin) # is this a primary hyperedge
+    @variable(model, re[1:n_re], Bin) # is this hyperedge active
+    NN_pred && @variable(model, reₚ[1:n_re], Bin) # is this a primary hyperedge
 
     # connect model variables to graph's edges
-    va2f = Dict([V₀(sg)[i] => va[i] for i in eachindex(V₀(sg))])
-    vp2f = Dict([V₀(sg)[i] => vp[i] for i in eachindex(V₀(sg))])
+    va2f = Dict([V₀(rg)[i] => va[i] for i in eachindex(V₀(rg))])
+    vp2f = Dict([V₀(rg)[i] => vp[i] for i in eachindex(V₀(rg))])
 
-    ea2f = Dict([E(sg)[i] => ea[i] for i in eachindex(E(sg))])
-    ep2f = Dict([E(sg)[i] => ep[i] for i in eachindex(E(sg))])
-    e₊2f = Dict([E(sg)[i] => e₊[i] for i in eachindex(E(sg))])
+    ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
+    ep2f = Dict([E(rg)[i] => ep[i] for i in eachindex(E(rg))])
+    e₊2f = Dict([E(rg)[i] => e₊[i] for i in eachindex(E(rg))])
 
     add_momentum && (c2f = Dict([connections[i] => f[i] for i in eachindex(connections)]))
 
-    hea2f = Dict([Eₕ₀(sg)[i] => he[i] for i in eachindex(Eₕ₀(sg))])
-    NN_pred && (hep2f = Dict(Eₕ₀(sg)[i] => heₚ[i] for i in eachindex(Eₕ₀(sg))))
+    hea2f = Dict([Eₕ₀(rg)[i] => re[i] for i in eachindex(Eₕ₀(rg))])
+    NN_pred && (rep2f = Dict(Eₕ₀(rg)[i] => reₚ[i] for i in eachindex(Eₕ₀(rg))))
 
     # define objective
     @objective(
@@ -87,36 +87,36 @@ function solve_rsa(
         ) +
         # standard hyperedges should be active
             sum(
-            hea2f[he] * log(ρₕ / (1 - ρₕ))
-                for he in Eₕ₀(sg)
+            hea2f[re] * log(ρₕ / (1 - ρₕ))
+                for re in Eₕ₀(rg)
         ) +
             # similar angles
             (
             !add_momentum ? 0 : sum(
-                    c2f[c] * log(ρₘ(sg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, c; ρₘ_max, ϵ)))
-                    for v in V₀(sg) for c in E₂(v) if !any([is_augmented(e) for e in c])
+                    c2f[c] * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
+                    for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
                 )
         ) +
             # gravitropy (needs to be split up into two sums to remain a linear objective)
             sum(
-            e₊2f[e] * log(ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ)))
-                for e in E₀(sg)
+            e₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+                for e in E₀(rg)
         ) +
             sum(
-            (ea2f[e] - e₊2f[e]) * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))
-                for e in E₀(sg)
+            (ea2f[e] - e₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+                for e in E₀(rg)
         ) +
             # NN pred
             (
             !NN_pred ? 0 : sum(
-                    hep2f[he] * log(ρₙₙ(he; ρₙₙ_max, ϵ) / (1 - ρₙₙ(he; ρₙₙ_max, ϵ)))
-                    for he in Eₕ₀(sg)
+                    rep2f[re] * log(ρₙₙ(re; ρₙₙ_max, ϵ) / (1 - ρₙₙ(re; ρₙₙ_max, ϵ)))
+                    for re in Eₕ₀(rg)
                 )
         ) +
             # overlap probability
             sum(
             va2f[v] * log(ρ₀(v; ρₒ_base, ϵ) / (1 - ρ₀(v; ρₒ_base, ϵ)))
-                for v in V₀(sg)
+                for v in V₀(rg)
         )
     )
 
@@ -125,7 +125,7 @@ function solve_rsa(
     # ## Flow formalism
 
     # ### For a standard vertex:
-    for v in V₀(sg)
+    for v in V₀(rg)
         # It can only be classified as primary if active
         @constraint(model, va2f[v] >= vp2f[v])
         # It is an active vertex ⇔ it is connected to two active edges
@@ -140,7 +140,7 @@ function solve_rsa(
     end
 
     # ### For any edge:
-    for e in E(sg)
+    for e in E(rg)
         # It can only be classified if active
         @constraint(model, ea2f[e] >= ep2f[e])
         @constraint(model, ea2f[e] >= e₊2f[e])
@@ -153,11 +153,11 @@ function solve_rsa(
     end
 
     # ### For a hyperedge:
-    for he in Eₕ₀(sg)
+    for re in Eₕ₀(rg)
         # It is active => at least one of its edges is active
-        @constraint(model, hea2f[he] <= sum(ea2f[e] for e in E(sg, he)))
+        @constraint(model, hea2f[re] <= sum(ea2f[e] for e in E(rg, re)))
         # It is classified as primary => at least one of its edges is classified as primary
-        NN_pred && @constraint(model, hep2f[he] <= sum(ep2f[e] for e in E(sg, he))) #! model can still choose to not classify he as primary
+        NN_pred && @constraint(model, rep2f[re] <= sum(ep2f[e] for e in E(rg, re))) #! model can still choose to not classify re as primary
     end
 
     # ## Special vertices
@@ -174,9 +174,9 @@ function solve_rsa(
 
     # A vertex can only split if its hypervertex is part of the primary root
     # i.e. lateral root segments can only appear in a hypervertex with an edge classified as a primary root
-    for v in inner_vertices(sg) # outer nodes can never split
+    for v in inner_vertices(rg) # outer nodes can never split
         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
-        @constraint(model, ea2f[e_vₛ] <= sum(vp2f[v_roommate] for v_roommate in V(sg, Vₕ(v))))
+        @constraint(model, ea2f[e_vₛ] <= sum(vp2f[v_roommate] for v_roommate in V(rg, Vₕ(v))))
     end
 
     # Primary root segments cannot form from division
@@ -194,17 +194,17 @@ function solve_rsa(
     end
 
     # A standard vertex may not have two active edges to the same hypervertex (not required if momentum is added)
-    add_momentum || for v in V₀(sg), he in Eₕ₀(v)
-        es = filter(e -> id(v) in vertices(e), E(sg, he))
+    add_momentum || for v in V₀(rg), re in Eₕ₀(v)
+        es = filter(e -> id(v) in vertices(e), E(rg, re))
         @constraint(model, sum(ea2f[e] for e in es) <= 1)
     end
 
     # symmetry breaking
-    for hv in Vₕ₀(sg)
-        svs = V(sg, hv)
-        for i in 2:length(svs)
-            @constraint(model, va2f[svs[i]] <= va2f[svs[i-1]])
-            @constraint(model, vp2f[svs[i]] <= vp2f[svs[i-1]])
+    for rv in V₀(rg)
+        rvs = V(rg, rv)
+        for i in 2:length(rvs)
+            @constraint(model, va2f[rvs[i]] <= va2f[rvs[i-1]])
+            @constraint(model, vp2f[rvs[i]] <= vp2f[rvs[i-1]])
         end
     end
 
@@ -212,7 +212,7 @@ function solve_rsa(
 
     if (hotstart_time > 0) && add_momentum
         @info "Running hotstart"
-        start_model = solve_rsa(sg; optimizer, add_momentum = false, time_limit = hotstart_time,
+        start_model = solve_rsa(rg; optimizer, add_momentum = false, time_limit = hotstart_time,
             num_roots, ρₐ, ρₕ, ρₘ_max, ρₙₙ_max, ρᵧ_max, ρₒ_base, α_down, ϵ)
 
         vars = all_variables(start_model)
@@ -237,12 +237,12 @@ function solve_rsa(
     return model
 end
 
-function solve_rsa(sgs::Vector{SuperGraph{T, U}}; kwargs...) where {T, U}
-    models = Vector{JuMP.Model}(undef, length(sgs))
+function solve_rsa(rgs::Vector{RootGraph{T, U}}; kwargs...) where {T, U}
+    models = Vector{JuMP.Model}(undef, length(rgs))
 
-    for (i, sg) in enumerate(sgs)
-        @info "Solving graph $i/$(length(sgs))"
-        models[i] = solve_rsa(sg; kwargs...)
+    for (i, rg) in enumerate(rgs)
+        @info "Solving graph $i/$(length(rgs))"
+        models[i] = solve_rsa(rg; kwargs...)
     end
 
     return models
@@ -253,16 +253,16 @@ end
 bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # change in angle probability
-ρₘ(sg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(sg, c..., id(v)) |> p -> bound(p; ϵ)
+ρₘ(rg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(rg, c..., id(v)) |> p -> bound(p; ϵ)
 
 # gravitropic growth probability
-ρᵧ(sg, e, α_down, reverse_order; ρᵧ_max, ϵ) = (
-    ρᵧ_max * (1 + cosine_similarity(sg, e, α_down; reverse_order)) / 2
+ρᵧ(rg, e, α_down, reverse_order; ρᵧ_max, ϵ) = (
+    ρᵧ_max * (1 + cosine_similarity(rg, e, α_down; reverse_order)) / 2
 ) |> p -> bound(p; ϵ)
 
 # NN pred primary probability
-ρₙₙ(he; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(he) |> p -> bound(p; ϵ)
+ρₙₙ(re; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p; ϵ)
 
 # root overlap probability
-ρ₀(sv::SingularVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(sv)) |> p -> bound(p; ϵ)
-order(sv::SingularVertex) = id(sv) - vertices(hypervertex(sv))[1]
+ρ₀(rv::RootVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(rv)) |> p -> bound(p; ϵ)
+order(rv::RootVertex) = id(rv) - vertices(hypervertex(rv))[1]

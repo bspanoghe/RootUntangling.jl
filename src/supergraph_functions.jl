@@ -1,68 +1,41 @@
-# get singular / hypervertex from vertex
-getsingularvertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(sg)[v] : V₊(sg)[-v]
-gethypervertex(Vₕ::Vector{HyperVertex{T, U}}, v::T) where {T, U} = Vₕ[findfirst(hv -> id(hv) == v, Vₕ)]
-gethypervertex(sg::SuperGraph{T, U}, v::T) where {T, U} = v > 0 ? Vₕ₀(sg)[v] : Vₕ₊(sg)[-v]
+# get rootvertex from its id ("the vertex")
+getrootvertex(rg::RootGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(rg)[v] : V₊(rg)[-v]
 
 # get coords from edges
-xs(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = x.(Vₕ(sg, he))
-ys(sg::SuperGraph{T, U}, he::HyperEdge{T, U}) where {T, U} = y.(Vₕ(sg, he))
-xs(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = x.(V(sg, se))
-ys(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = y.(V(sg, se))
+xs(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = x.(V(rg, re))
+ys(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = y.(V(rg, re))
 
 # get neighbors
-function roommate(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
-    is_augmented(sv) && error("Augmented vertices have no roommates")
-    return V₀(sg)[roommate(id(sv))]
-end
+neighbor(rv::RootVertex{T, U}, re::RootEdge{T, U}) where {T, U} = (
+    vertices(re)[findfirst(v -> v != id(rv), vertices(re))]
+)
+neighbor(rg::RootGraph{T, U}, rv::RootVertex{T, U}, re::RootEdge{T, U}) where {T, U} = (
+    getrootvertex(rg, neighbor(rv, re))
+)
+neighbors(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = [neighbor(rg, rv, re) for re in edges(rv)]
 
-neighbor(av::AbstractVertex{T, U}, ae::AbstractEdge{T}) where {T, U} = (
-    vertices(ae)[findfirst(v -> v != id(av), vertices(ae))]
-)
-neighbor(hv::HyperVertex{T, U}, he::HyperEdge{T, U}, Vₕ::Vector{HyperVertex{T, U}}) where {T, U} = (
-    gethypervertex(Vₕ, neighbor(hv, he))
-)
-neighbor(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}, se::SingularEdge{T}) where {T, U} = (
-    getsingularvertex(sg, neighbor(sv, se))
-)
-neighbor(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}, he::HyperEdge{T}) where {T, U} = (
-    gethypervertex(sg, neighbor(hv, he))
-)
-neighbors(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [neighbor(sg, hv, he) for he in edges(hv)]
-function neighbors(sg::SuperGraph{T, U}, sv::SingularVertex{T, U}) where {T, U}
-    nbs = [neighbor(sg, sv, se) for se in externaledges(sv)]
-    is_augmented(sv) || (push!(nbs, roommate(sg, sv)))
-    return nbs
-end
-
-inner_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) > 1]
-outer_vertices(sg::SuperGraph) = [v for v in V₀(sg) if length([n for n in neighbors(sg, Vₕ(v)) if !is_augmented(n)]) == 1]
+inner_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neighbors(rg, Vₕ(v)) if !is_augmented(n)]) > 1]
+outer_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neighbors(rg, Vₕ(v)) if !is_augmented(n)]) == 1]
 
 # direction
-direction(sv::SingularVertex{T, U}, ee::ExternalEdge{T}) where {T, U} = src(ee) == id(sv) ? polarity(ee) : -polarity(ee)
-direction(sv::SingularVertex{T, U}, ie::InternalEdge{T}) where {T, U} = src(ie) == id(sv) ? 1 : -1
-direction(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}) where {T, U} = id(sv1) < id(sv2) ? 1 : -1
+direction(rv::RootVertex{T, U}, re::RootEdge{T}) where {T, U} = src(re) == id(rv) ? 1 : -1
+direction(rv1::RootVertex{T, U}, rv2::RootVertex{T, U}) where {T, U} = id(rv1) < id(rv2) ? 1 : -1
 
 # angles
-angle(hv1::HyperVertex{T, U}, hv2::HyperVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
-    reverse_order ? atan(y(hv1) - y(hv2), x(hv1) - x(hv2)) : atan(y(hv2) - y(hv1), x(hv2) - x(hv1))
+angle(rv1::RootVertex{T, U}, rv2::RootVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
+    reverse_order ? atan(y(rv1) - y(rv2), x(rv1) - x(rv2)) : atan(y(rv2) - y(rv1), x(rv2) - x(rv1))
 )
-angle(sv1::SingularVertex{T, U}, sv2::SingularVertex{T, U}; reverse_order::Bool = false) where {T, U} = (
-    angle(hypervertex(sv1), hypervertex(sv2); reverse_order)
-)
-angle(sg::SuperGraph{T, U}, se::SingularEdge{T}; reverse_order::Bool = false) where {T, U} = (
-    vertices(se) .|> (v -> getsingularvertex(sg, v)) .|> hypervertex |> hvs -> angle(hvs...; reverse_order)
-)
-angle(sg::SuperGraph{T, U}, he::HyperEdge{T, U}; reverse_order::Bool = false) where {T, U} = (
-    vertices(he) .|> (v -> gethypervertex(sg, v)) |> hvs -> angle(hvs...; reverse_order)
+angle(rg::RootGraph{T, U}, re::RootEdge{T, U}; reverse_order::Bool = false) where {T, U} = (
+    angle(V(rg, re)...; reverse_order)
 )
 
-cosine_similarity(sg::SuperGraph{T, U}, ae1::AbstractEdge{T}, ae2::AbstractEdge{T}, v::T) where {T, U} = (
-    cos(-((angle(sg, e, reverse_order = (v == vertices(e)[1])) for e in [ae1, ae2])...)) # ensure angle of edge is calculated according to same common vertex as starting point
+cosine_similarity(rg::RootGraph{T, U}, re1::RootEdge{T, U}, re2::RootEdge{T, U}, v::T) where {T, U} = (
+    cos(-((angle(rg, e, reverse_order = (v == vertices(e)[1])) for e in [re1, re2])...)) # ensure angle of edge is calculated according to same common vertex as starting point
 )
-cosine_similarity(sg::SuperGraph{T, U}, ae::AbstractEdge{T}, α; reverse_order::Bool = false) where {T, U} = (
-    cos(angle(sg, ae; reverse_order) - α)
+cosine_similarity(rg::RootGraph{T, U}, re::RootEdge{T, U}, α; reverse_order::Bool = false) where {T, U} = (
+    cos(angle(rg, re; reverse_order) - α)
 )
 
-angle_dissimilarity(sg::SuperGraph{T, U}, ae1::AbstractEdge{T}, ae2::AbstractEdge{T}, v::T) where {T, U} = (
-    (1 - cosine_similarity(sg, ae1, ae2, v)) / 2
+angle_dissimilarity(rg::RootGraph{T, U}, re1::RootEdge{T, U}, re2::RootEdge{T, U}, v::T) where {T, U} = (
+    (1 - cosine_similarity(rg, re1, re2, v)) / 2
 )

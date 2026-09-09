@@ -1,7 +1,7 @@
-function greedy_switch(sg::SuperGraph, model::JuMP.Model, roots::Vector{<:Root};
+function greedy_switch(rg::RootGraph, model::JuMP.Model, roots::Vector{<:Root};
         max_tries = 100, f_obj::Function = roughness
     )
-    if isempty(find_overlaps(sg, model, roots))
+    if isempty(find_overlaps(rg, model, roots))
         @info "No overlaps found"
         return roots
     end
@@ -15,14 +15,14 @@ function greedy_switch(sg::SuperGraph, model::JuMP.Model, roots::Vector{<:Root};
         counter += 1
         counter > max_tries && (@info "Max tries reached"; break)
 
-        overlap_dict = find_overlaps(sg, model, roots_copy)
+        overlap_dict = find_overlaps(rg, model, roots_copy)
         switch_dict = get_switch_dict(overlap_dict, roots_copy)      
         n = maximum(keys(switch_dict))
 
-        fs = [evaluate_objective(sg, roots_copy, f_obj, create_switches(n, i), switch_dict) for i in 1:n]
+        fs = [evaluate_objective(rg, roots_copy, f_obj, create_switches(n, i), switch_dict) for i in 1:n]
         best_idx = argmin(fs)
         if fs[best_idx] < current_f
-            make_switches!(sg, roots_copy, create_switches(n, best_idx), switch_dict)
+            make_switches!(rg, roots_copy, create_switches(n, best_idx), switch_dict)
             current_f = fs[best_idx]
         else
             improving = false
@@ -32,72 +32,72 @@ function greedy_switch(sg::SuperGraph, model::JuMP.Model, roots::Vector{<:Root};
     return roots_copy
 end
 
-function greedy_switch(sg::SuperGraph, model::JuMP.Model, root_systems::Vector{<:Vector{<:Root}};
+function greedy_switch(rg::RootGraph, model::JuMP.Model, root_systems::Vector{<:Vector{<:Root}};
         max_tries = 100, f_obj::Function = roughness
     )
     
-    roots_tangled = greedy_switch(sg, model, reduce(vcat, root_systems); max_tries, f_obj)
-    return separate_root_systems(sg, get_se_classification_dict(sg, model), roots_tangled)
+    roots_tangled = greedy_switch(rg, model, reduce(vcat, root_systems); max_tries, f_obj)
+    return separate_root_systems(rg, get_re_classification_dict(rg, model), roots_tangled)
 end
 
 # does a root use one of the edges of a segment
-are_overlapping(sg::SuperGraph, he::HyperEdge, r::Root) = (
-    !all([isdisjoint(vs, vertices(r)) for vs in vertices(Vₕ(sg, he))])
+are_overlapping(rg::RootGraph, re::RootEdge, r::Root) = (
+    !all([isdisjoint(vs, vertices(r)) for vs in vertices(Vₕ(rg, re))])
 )
 
 # find hyperedges where multiple lateral roots overlap (and can switch)
 # primary root is not allowed to swap because it can break the assumption that only the primary root can split
-function find_overlaps(sg::SuperGraph, model::JuMP.Model, roots)
-    he_classification_dict = get_he_classification_dict(sg, model)
-    overlap_hes = filter(he -> imag(he_classification_dict[he]) > 1, Eₕ₀(sg))
+function find_overlaps(rg::RootGraph, model::JuMP.Model, roots)
+    re_classification_dict = get_re_classification_dict(rg, model)
+    overlap_res = filter(re -> imag(re_classification_dict[re]) > 1, Eₕ₀(rg))
 
     # map all hyperedges to the roots they are part of
     # discarding roots of length 2 or smaller (switching does nothing)
     overlap_dict = [
-        he => [r for r in roots if are_overlapping(sg, he, r) && length(r) > 2]
-            for he in overlap_hes
-    ] |> Dict{HyperEdge, Vector{<:Root}}
+        re => [r for r in roots if are_overlapping(rg, re, r) && length(r) > 2]
+            for re in overlap_res
+    ] |> Dict{RootEdge, Vector{<:Root}}
     
-    isempty(overlap_dict) && (return Dict{HyperEdge, Vector{<:Root}}())
+    isempty(overlap_dict) && (return Dict{RootEdge, Vector{<:Root}}())
 
     # if you have multiple edges in a connected linear path, each with the same amount of roots, only choose one edge from that path
     # reasoning: switching roots on multiple of these consecutive edges has no added effect over switching them on just one
-    overlap_hes_subset = [
-        get_linear_chains(filter(he -> length(overlap_dict[he]) == n, overlap_hes))
+    overlap_res_subset = [
+        get_linear_chains(filter(re -> length(overlap_dict[re]) == n, overlap_res))
             for n in unique(length.(values(overlap_dict)))
     ] |> x -> reduce(vcat, x) .|> first
 
     overlap_dict_subset = [
-        he => [r for r in roots if are_overlapping(sg, he, r)]
-            for he in overlap_hes_subset
-    ] |> Dict{HyperEdge, Vector{<:Root}}
+        re => [r for r in roots if are_overlapping(rg, re, r)]
+            for re in overlap_res_subset
+    ] |> Dict{RootEdge, Vector{<:Root}}
 
     return overlap_dict_subset
 end
 
 # group edges into linear chains
-function get_linear_chains(hes::Vector{<:HyperEdge})
-    chains = Vector{HyperEdge}[hes[1:1]]
-    remaining_hes = hes[2:end]
+function get_linear_chains(res::Vector{<:RootEdge})
+    chains = Vector{RootEdge}[res[1:1]]
+    remaining_res = res[2:end]
 
-    while !isempty(remaining_hes)
+    while !isempty(remaining_res)
         chain = chains[end]
-        head_idx = findfirst(he -> !isdisjoint(vertices(chain[1]), vertices(he)), remaining_hes)
+        head_idx = findfirst(re -> !isdisjoint(vertices(chain[1]), vertices(re)), remaining_res)
         if !isnothing(head_idx)
-            he = popat!(remaining_hes, head_idx)
-            pushfirst!(chain, he)
+            re = popat!(remaining_res, head_idx)
+            pushfirst!(chain, re)
             continue
         end
 
-        tail_idx = findfirst(he -> !isdisjoint(vertices(chain[end]), vertices(he)), remaining_hes)
+        tail_idx = findfirst(re -> !isdisjoint(vertices(chain[end]), vertices(re)), remaining_res)
         if !isnothing(tail_idx)
-            he = popat!(remaining_hes, tail_idx)
-            push!(chain, he)
+            re = popat!(remaining_res, tail_idx)
+            push!(chain, re)
             continue
         end
 
-        he = pop!(remaining_hes)
-        push!(chains, [he])
+        re = pop!(remaining_res)
+        push!(chains, [re])
     end
 
     return chains
@@ -106,48 +106,48 @@ end
 function get_switch_dict(overlap_dict, roots)
     switch_pairs = Pair[]
     counter = 0
-    for (he, overlap_roots) in overlap_dict
+    for (re, overlap_roots) in overlap_dict
         for i in eachindex(overlap_roots), j in eachindex(overlap_roots)
             j <= i && continue # order of roots is not important
             counter += 1
             r1_idx = findfirst(r -> r == overlap_roots[i], roots)
             r2_idx = findfirst(r -> r == overlap_roots[j], roots)
-            push!(switch_pairs, counter => (he, r1_idx, r2_idx))
+            push!(switch_pairs, counter => (re, r1_idx, r2_idx))
         end
     end
 
     return Dict(switch_pairs)
 end
 
-function evaluate_objective(sg::SuperGraph, roots::Vector{<:Root}, f_obj::Function, switches::Vector{Bool}, switch_dict::Dict)
+function evaluate_objective(rg::RootGraph, roots::Vector{<:Root}, f_obj::Function, switches::Vector{Bool}, switch_dict::Dict)
     roots_copy = deepcopy(roots)
-    make_switches!(sg, roots_copy, switches, switch_dict)
+    make_switches!(rg, roots_copy, switches, switch_dict)
     return f_obj(roots_copy)
 end
 
 create_switches(n::Integer, i::Integer) = [zeros(Bool, i - 1); true; zeros(Bool, n - i)]
 
-function make_switches!(sg, roots, switches, switch_dict)
+function make_switches!(rg, roots, switches, switch_dict)
     for switch in findall(switches)
-        he, r1_idx, r2_idx = switch_dict[switch]
-        switch!(sg, he, roots[r1_idx], roots[r2_idx])
+        re, r1_idx, r2_idx = switch_dict[switch]
+        switch!(rg, re, roots[r1_idx], roots[r2_idx])
     end
 
     return nothing
 end
 
 # perform a crossing over between two roots
-function switch!(sg::SuperGraph, he::HyperEdge, r1::Root, r2::Root)
+function switch!(rg::RootGraph, re::RootEdge, r1::Root, r2::Root)
     # get (not hyper) vertices of hyperedge
-    vs_he_src, vs_he_dst = vertices.(Vₕ(sg, he)) # `.` to get separately for both hypervertices
+    vs_re_src, vs_re_dst = vertices.(Vₕ(rg, re)) # `.` to get separately for both hypervertices
 
     # find vertices in roots that match source of hyperedge
-    src_idx1 = findfirst(v -> v in vs_he_src, vertices(r1))
-    src_idx2 = findfirst(v -> v in vs_he_src, vertices(r2))
+    src_idx1 = findfirst(v -> v in vs_re_src, vertices(r1))
+    src_idx2 = findfirst(v -> v in vs_re_src, vertices(r2))
 
     # find vertices in roots that match destination of hyperedge (only need to look at vertices neighbouring source idx)
-    dst_idx1 = get(vertices(r1), src_idx1 - 1, 0) in vs_he_dst ? src_idx1 - 1 : src_idx1 + 1
-    dst_idx2 = get(vertices(r2), src_idx2 - 1, 0) in vs_he_dst ? src_idx2 - 1 : src_idx2 + 1
+    dst_idx1 = get(vertices(r1), src_idx1 - 1, 0) in vs_re_dst ? src_idx1 - 1 : src_idx1 + 1
+    dst_idx2 = get(vertices(r2), src_idx2 - 1, 0) in vs_re_dst ? src_idx2 - 1 : src_idx2 + 1
 
     # skip switching if hyperedge is at an extremity of either root (switching does nothing)
     if any([idx in [1, length(r1)] for idx in [src_idx1, dst_idx1]]) || any([idx in [1, length(r2)] for idx in [src_idx2, dst_idx2]])

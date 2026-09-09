@@ -13,29 +13,26 @@ edge_data_dict = Dict(
 )
 
 pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
-sg = get_supergraph(pg);
+rg = get_supergraph(pg);
 
 # # vertices
-@test length(Vₕ₀(sg)) == 3
-@test length(Vₕ₊(sg)) == 3
+@test length(V₀(rg)) == 3
+@test length(V₊(rg)) == 3
 @test issetequal(
-    Vₕ(sg),
-    [Vₕ₀(sg); Vₕ₊(sg)]
+    V(rg),
+    [V₀(rg); V₊(rg)]
 )
 
-@test length(V₀(sg)) == 6
-@test length(V₊(sg)) == 3
-
-@test id.(V₀(sg)) == 1:6
-@test id.(V₊(sg)) == -1:-1:-3
+@test id.(V₀(rg)) == 1:3
+@test id.(V₊(rg)) == -1:-1:-3
 
 # # edges
 # ## direction
-sv = V₊(sg)[1]
-@test all([direction(sv, e) == 1 for e in edges(sv)])
+rv = V₊(rg)[1]
+@test all([direction(rv, e) == 1 for e in edges(rv)])
 
-sv = V₊(sg)[2]
-@test all([direction(sv, e) == -1 for e in edges(sv)])
+rv = V₊(rg)[2]
+@test all([direction(rv, e) == 1 for e in edges(rv)])
 
-sv = V₊(sg)[3]
-@test all([direction(sv, e) == 1 for e in edges(sv)])
+rvv = V₊(rg)[3]
+@test all([direction(rv, e) == 1 for e in edges(rv)])

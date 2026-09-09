@@ -287,9 +287,6 @@ end
 function augment!(metavertices, segments; augmented_margins)
     pg₀ = get_pregraph(metavertices, segments)
 
-    # Take care of id parity when making augmented vertices
-    # odd => edges go FROM vertex (appearance)
-    # even => edges go TO vertex (disappearance)
     v_a = MetaVertex(-1, :appearance, get_augmented_coords(-1, metavertices; augmented_margins)...)
     v_d = MetaVertex(-2, :disappearance, get_augmented_coords(-2, metavertices; augmented_margins)...)
     v_s = MetaVertex(-3, :splitting, get_augmented_coords(-3, metavertices; augmented_margins)...)

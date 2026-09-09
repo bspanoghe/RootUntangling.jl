@@ -1,235 +1,132 @@
 # # ids
 is_augmented(v::Integer) = v < 0
-polarity(v::Integer) = isodd(v) ? 1 : -1
-roommate(v::Integer) = isodd(v) ? v+1 : v-1
 
 # # edges
-abstract type AbstractEdge{T} end
-src(ae::AbstractEdge) = ae.src
-dst(ae::AbstractEdge) = ae.dst
-vertices(ae::AbstractEdge) = (src(ae), dst(ae))
-
-is_augmented(ae::AbstractEdge) = any(is_augmented.(vertices(ae)))
-Base.:(==)(ae1::AbstractEdge, ae2::AbstractEdge) = vertices(ae1) == vertices(ae2)
-Base.unique(aes::Vector{<:AbstractEdge}) = unique(x -> vertices(x), aes) # doesn't automatically use my equality operator :(
-Base.unique!(aes::Vector{<:AbstractEdge}) = unique!(x -> vertices(x), aes) # sad times
-
-Base.show(io::IO, ae::AbstractEdge) = print(io, "$(typeof(ae).name.name)$(vertices(ae))")
-Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.name)$(vertices.(aes))")
-
 """
-    HyperEdge{T, U}
+    RootEdge{T, U}
 
 Represents a segment from a root scan, which may contain roots going in either direction.
 """
-struct HyperEdge{T, U} <: AbstractEdge{T}
+struct RootEdge{T, U}
     src::T
     dst::T
     segment_id::T
     width::U
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove Missing Union later
 
-    HyperEdge(src::T, dst::T, segment_id::T, width::U, pred_primary::Union{U, Missing}) where {T, U} = (
+    RootEdge(src::T, dst::T, segment_id::T, width::U, pred_primary::Union{U, Missing}) where {T, U} = (
         new{T, U}(sort([src, dst])..., segment_id, width, pred_primary)
     )
 end
-segment_id(he::HyperEdge) = he.segment_id
-width(he::HyperEdge) = he.width
-pred_primary(he::HyperEdge) = he.pred_primary
+RootEdge(src::T, dst::T) where {T} = RootEdge(src, dst, 0, NaN, NaN)
+RootEdge(s::Segment) = RootEdge(vertices(s)..., id(s), width(s), pred_primary(s))
 
-HyperEdge(src::T, dst::T) where {T} = HyperEdge(src, dst, 0, NaN, NaN)
-HyperEdge(s::Segment) = HyperEdge(vertices(s)..., id(s), width(s), pred_primary(s))
+src(re::RootEdge) = re.src
+dst(re::RootEdge) = re.dst
+segment_id(re::RootEdge) = re.segment_id
+width(re::RootEdge) = re.width
+pred_primary(re::RootEdge) = re.pred_primary
+vertices(re::RootEdge) = (src(re), dst(re))
 
-"""
-    SingularEdge{T}
+is_augmented(re::RootEdge) = any(is_augmented.(vertices(re)))
 
-Represents a segment from a root scan, with roots going in one set direction.
-"""
-abstract type SingularEdge{T} <: AbstractEdge{T} end
-polarity(se::SingularEdge) = polarity(src(se))
-
-# Edge between vertices of different hypervertices
-struct ExternalEdge{T, U} <: SingularEdge{T}
-    src::T
-    dst::T
-    hyperedge::HyperEdge{T, U}
-
-    ExternalEdge(src::T, dst::T, he::HyperEdge{T, U}) where {T, U} = (
-        new{T, U}(sort([src, dst])..., he)
-    )
-end
-hyperedge(ee::ExternalEdge) = ee.hyperedge
-
-# Edge between vertices of the same hypervertex
-struct InternalEdge{T} <: SingularEdge{T}
-    src::T
-    dst::T
-end
-
-isinternal(se::SingularEdge) = se isa InternalEdge
-# SingularEdge(s::Segment) = SingularEdge(vertices(s)..., HyperEdge(s))
+Base.:(==)(re1::RootEdge, re2::RootEdge) = vertices(re1) == vertices(re2)
+Base.unique(res::Vector{<:RootEdge}) = unique(x -> vertices(x), res) # doesn't automatically use my equality operator :(
+Base.unique!(res::Vector{<:RootEdge}) = unique!(x -> vertices(x), res) # sad times
+Base.show(io::IO, re::RootEdge) = print(io, "$(typeof(re).name.name)$(vertices(re))")
+Base.show(io::IO, res::Vector{<:RootEdge}) = print(io, "$(typeof(res).name.name)$(vertices.(res))")
 
 # vertices
-abstract type AbstractVertex{T, U} end
-id(av::AbstractVertex) = av.id
-edges(av::AbstractVertex) = av.edges
-edges(avs::Vector{<:AbstractVertex}) = reduce(vcat, edges.(avs), init = eltype(avs)[])
-
-Base.show(io::IO, av::AbstractVertex) = print(io, "$(typeof(av).name.name)$((id(av), edges(av)))")
-Base.show(io::IO, avs::Vector{<:AbstractVertex}) = print(io, "$(typeof(avs).name.name)$(id.(avs))")
-
 """
-    HyperVertex{T, U}
+    RootVertex{T, U}
 
 Represents a branchpoint or endpoint of a segment in the image.
 """
-struct HyperVertex{T, U} <: AbstractVertex{T, U}
+struct RootVertex{T, U}
     id::T
-    edges::Vector{HyperEdge{T, U}}
+    edges::Vector{RootEdge{T, U}}
     x::U
     y::U
     pred_split::Union{U, Missing} #! only for testing first 7 ROI - remove later
-    vertices::Vector{T}
 
-    HyperVertex(id::T, edges::Vector{HyperEdge{T, U}}, x::U, y::U, pred_split::Union{U, Missing}, vertices::Vector{T}) where {T, U} = (
-        new{T, U}(id, sort(edges, by = e -> src(e)), x, y, pred_split, sort(vertices))
+    RootVertex(id::T, edges::Vector{RootEdge{T, U}}, x::U, y::U, pred_split::Union{U, Missing}) where {T, U} = (
+        new{T, U}(id, sort(edges, by = e -> src(e)), x, y, pred_split)
     )
 end
-HyperVertex(id, edges, x, y, pred_split) = HyperVertex(id, edges, x, y, pred_split, [roommate(2*id), 2*id])
+RootVertex(id, edges, x, y, pred_split) = RootVertex(id, edges, x, y, pred_split)
 
-x(hv::HyperVertex) = hv.x
-y(hv::HyperVertex) = hv.y
-pred_split(hv::HyperVertex) = hv.pred_split
-vertices(hv::HyperVertex) = hv.vertices
+id(rv::RootVertex) = rv.id
+edges(rv::RootVertex) = rv.edges
+x(rv::RootVertex) = rv.x
+y(rv::RootVertex) = rv.y
+pred_split(rv::RootVertex) = rv.pred_split
 
-coords(hv::HyperVertex) = (x(hv), y(hv))
-is_augmented(hv::HyperVertex) = any(is_augmented.(vertices(hv)))
-vertices(hvs::Vector{<:HyperVertex}) = reduce(vcat, vertices.(hvs))
+edges(rvs::Vector{<:RootVertex}) = reduce(vcat, edges.(rvs), init = eltype(rvs)[])
+coords(rv::RootVertex) = (x(rv), y(rv))
+is_augmented(rv::RootVertex) = is_augmented(id(rv))
 
-"""
-    SingularVertex{T, U}
-
-Represents a branchpoint or endpoint of a segment in the image for a given direction.
-"""
-struct SingularVertex{T, U} <: AbstractVertex{T, U}
-    id::T
-    externaledges::Vector{ExternalEdge{T, U}}
-    internaledges::Vector{InternalEdge{T}}
-    hypervertex::HyperVertex{T, U}
-
-    SingularVertex(id::T, ees::Vector{ExternalEdge{T, U}}, ies::Vector{InternalEdge{T}}, hv::HyperVertex{T, U}) where {T, U} = (
-        new{T, U}(id, sort(ees, by = src), sort(ies, by = src), hv)
-    )
-end
-externaledges(sv::SingularVertex) = sv.externaledges
-internaledges(sv::SingularVertex) = sv.internaledges
-edges(sv::SingularVertex) = [externaledges(sv); internaledges(sv)]
-hypervertex(sv::SingularVertex) = sv.hypervertex
-
-polarity(sv::SingularVertex) = polarity(id(sv))
-is_augmented(sv::SingularVertex) = is_augmented(id(sv))
-x(sv::SingularVertex) = x(hypervertex(sv))
-y(sv::SingularVertex) = y(hypervertex(sv))
-coords(sv::SingularVertex) = coords(hypervertex(sv))
+Base.show(io::IO, rv::RootVertex) = print(io, "$(typeof(rv).name.name)$((id(rv), edges(rv)))")
+Base.show(io::IO, rvs::Vector{<:RootVertex}) = print(io, "$(typeof(rvs).name.name)$(id.(rvs))")
 
 # graphs
 """
-    SuperGraph{T, U}
+    RootGraph{T, U}
 
 Represents one or more root systems.
-
-The (singular) edges E represent the possible presence of a single root, 
-while hyperedges Eₕ are groups of edges at the same position, representing a segment in the scan which may contain multiple roots.
 """
-struct SuperGraph{T, U}
-    Vₕ₀::Vector{HyperVertex{T, U}}
-    Vₕ₊::Vector{HyperVertex{T, U}}
-    V₀::Vector{SingularVertex{T, U}}
-    V₊::Vector{SingularVertex{T, U}}
+struct RootGraph{T, U}
+    V₀::Vector{RootVertex{T, U}}
+    V₊::Vector{RootVertex{T, U}}
+    E₀::Vector{RootEdge{T, U}}
+    E₊::Vector{RootEdge{T, U}}
 
-    Eₕ₀::Vector{HyperEdge{T}}
-    Eₕ₊::Vector{HyperEdge{T}}
-    E₀::Vector{SingularEdge{T}}
-    E₊::Vector{SingularEdge{T}}
-
-    he2e::Dict{HyperEdge{T}, Vector{SingularEdge{T}}}
-    function SuperGraph(
-            Vₕ₀::Vector{HyperVertex{T, U}}, Vₕ₊::Vector{HyperVertex{T, U}},
-            V₀::Vector{SingularVertex{T, U}}, V₊::Vector{SingularVertex{T, U}}
+    function RootGraph(
+            V₀::Vector{RootVertex{T, U}}, V₊::Vector{RootVertex{T, U}}
         ) where {T, U}
 
         # sort all vertices
-        sort!(Vₕ₀, by = x -> id(x))
-        sort!(Vₕ₊, by = x -> -id(x)) # special vertices use negative integers as id
         sort!(V₀, by = x -> id(x))
         sort!(V₊, by = x -> -id(x)) # special vertices use negative integers as id
 
         # assert all ids are consecutive integers starting from 1 / -1
-        @assert id.(Vₕ₀) == 1:length(Vₕ₀)
-        @assert id.(Vₕ₊) == -1:-1:-length(Vₕ₊)
         @assert id.(V₀) == 1:length(V₀)
         @assert id.(V₊) == -1:-1:-length(V₊)
 
         # get edges and sort
-        Eₕ₀ = [e for e in edges(Vₕ₀) if (!is_augmented(e))] |> unique |> es -> sort(es, by = e -> src(e))
-        Eₕ₊ = edges(Vₕ₊) |> unique |> es -> sort(es, by = e -> src(e))
         E₀ = [e for e in edges(V₀) if !(is_augmented(e))] |> unique |> es -> sort(es, by = e -> src(e))
         E₊ = edges(V₊) |> unique |> es -> sort(es, by = e -> src(e))
 
-        # precompute mappings
-        he2e = Dict([
-            he => unique([e for e in [E₀; E₊] if e isa ExternalEdge && hyperedge(e) == he])
-            for he in [Eₕ₀; Eₕ₊]
-        ])
-
-        return new{T, U}(Vₕ₀, Vₕ₊, V₀, V₊, Eₕ₀, Eₕ₊, E₀, E₊, he2e)
+        return new{T, U}(V₀, V₊, E₀, E₊)
     end
 end
-Vₕ₀(sg::SuperGraph) = sg.Vₕ₀
-Vₕ₊(sg::SuperGraph) = sg.Vₕ₊
-V₀(sg::SuperGraph) = sg.V₀
-V₊(sg::SuperGraph) = sg.V₊
+V₀(rg::RootGraph) = rg.V₀
+V₊(rg::RootGraph) = rg.V₊
+E₀(rg::RootGraph) = rg.E₀
+E₊(rg::RootGraph) = rg.E₊
 
-Eₕ₀(sg::SuperGraph) = sg.Eₕ₀
-Eₕ₊(sg::SuperGraph) = sg.Eₕ₊
-E₀(sg::SuperGraph) = sg.E₀
-E₊(sg::SuperGraph) = sg.E₊
+V(rg::RootGraph) = [V₊(rg); V₀(rg)]
+E(rg::RootGraph) = [E₊(rg); E₀(rg)]
 
-Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
+Base.length(rg::RootGraph) = length(V₀(rg))
 
-E(sg::SuperGraph, he::HyperEdge) = sg.he2e[he]
-
-Vₕ(sg::SuperGraph) = [Vₕ₊(sg); Vₕ₀(sg)]
-V(sg::SuperGraph) = [V₊(sg); V₀(sg)]
-Eₕ(sg::SuperGraph) = [Eₕ₊(sg); Eₕ₀(sg)]
-E(sg::SuperGraph) = [E₊(sg); E₀(sg)]
-internaledges(sg::SuperGraph) = internaledges.(V₀(sg))
-
-E₂(sv::SingularVertex) = edges(sv) |> es -> [
+E₂(rv::RootVertex) = edges(rv) |> es -> [
     [es[i], es[j]]
     for i in 1:length(es) for j in i+1:length(es)
-    if !all(is_augmented.(es[[i, j]])) &&
-        !all(isinternal.(es[[i, j]]))
+    if !all(is_augmented.(es[[i, j]]))
 ]
-E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[])
-E₂(sg::SuperGraph, se::SingularEdge) = [
-    [se, nb_se]
-    for nb_se in unique(reduce(vcat, edges.(V(sg, se))))
-    if nb_se != se
+E₂(rg::RootGraph) = E₂.(V₀(rg)) |> x -> reduce(vcat, x, init = eltype(x)[])
+E₂(rg::RootGraph, re::RootEdge) = [
+    [re, nb_re]
+    for nb_re in unique(reduce(vcat, edges.(V(rg, re))))
+    if nb_re != re
 ]
-E₂(sv::SingularVertex, se::SingularEdge) = filter(c -> se in c, E₂(sv))
+E₂(rv::RootVertex, re::RootEdge) = filter(c -> re in c, E₂(rv))
 
-# additional methods using mathematical syntax of V / V₀ / Vₕ / Vₕ₀ and E / E₀ / Eₕ / Eₕ₀
-V(sg::SuperGraph{T, U}, se::SingularEdge{T}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
-V(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(hv)]
-Vₕ(sv::SingularVertex) = hypervertex(sv)
-Vₕ(sg::SuperGraph, he::HyperEdge) = [gethypervertex(Vₕ(sg), v) for v in vertices(he)]
+# additional methods using mathematical syntax of V / V₀ and E / E₀
+V(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = [getrootvertex(rg, v) for v in vertices(re)]
+V(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = [getrootvertex(rg, v) for v in vertices(rv)]
 
-E(av::AbstractVertex) = edges(av)
-E(avs::Vector{<:AbstractVertex}) = reduce(vcat, E.(avs), init = eltype(avs)[])
-E(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = E(V(sg, hv))
-E₀(av::AbstractVertex) = filter(!is_augmented, E(av))
-Eₕ(hv::HyperVertex) = edges(hv)
-Eₕ(sv::SingularVertex) = Eₕ(Vₕ(sv))
-Eₕ(se::SingularEdge) = hyperedge(se)
-Eₕ₀(sv::SingularVertex) = filter(!is_augmented, Eₕ(sv))
+E(rv::RootVertex) = edges(rv)
+E(rvs::Vector{<:RootVertex}) = reduce(vcat, E.(rvs), init = eltype(rvs)[])
+E(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = E(V(rg, rv))
+E₀(rv::RootVertex) = filter(!is_augmented, E(rv))

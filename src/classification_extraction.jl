@@ -1,39 +1,17 @@
-function get_se_classification_dict(sg::SuperGraph, model::JuMP.Model)
+function get_re_classification_dict(rg::RootGraph, model::JuMP.Model)
     ea = value.(model[:ea])
     ep = value.(model[:ep])
 
-    se_classification_dict = [E(sg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i])) * im for i in eachindex(E(sg))] |> Dict
+    re_classification_dict = [E(rg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i])) * im for i in eachindex(E(rg))] |> Dict
 
-    return se_classification_dict
+    return re_classification_dict
 end
 
-function get_he_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    se_classification_dict = get_se_classification_dict(sg, model)
-    he_classification_dict = [he => sum([se_classification_dict[e] for e in E(sg, he)]) for he in Eₕ(sg)] |> Dict
-
-    return he_classification_dict
-end
-
-function get_sv_classification_dict(sg::SuperGraph, model::JuMP.Model)
+function get_rv_classification_dict(rg::RootGraph, model::JuMP.Model)
     va = value.(model[:va])
     vp = value.(model[:vp])
 
-    sv_classification_dict = [V₀(sg)[i] => round(Bool, value(vp[i])) + round(Bool, value(va[i]) - value(vp[i])) * im for i in eachindex(V₀(sg))] |> Dict
+    rv_classification_dict = [V₀(rg)[i] => round(Bool, value(vp[i])) + round(Bool, value(va[i]) - value(vp[i])) * im for i in eachindex(V₀(rg))] |> Dict
 
-    return sv_classification_dict
-end
-
-function get_hv_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    sv_classification_dict = get_sv_classification_dict(sg, model)
-    hv_classification_dict = [hv => sum([sv_classification_dict[v] for v in V(sg, hv)]) for hv in Vₕ₀(sg)] |> Dict
-
-    return hv_classification_dict
-end
-
-function get_polarity_classification_dict(sg::SuperGraph, model::JuMP.Model)
-    e₊ = value.(model[:e₊])
-
-    polarity_classification_dict = [E(sg)[i] => round(Bool, value(e₊[i])) for i in eachindex(E(sg))] |> Dict
-
-    return polarity_classification_dict
+    return rv_classification_dict
 end

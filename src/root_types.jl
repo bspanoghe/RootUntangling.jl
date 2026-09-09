@@ -9,16 +9,16 @@ You can inspect these using the function [`examine`](@ref) or manually calculate
 """
 struct Root{T, U}
     is_primary::Bool
-    V::Vector{SingularVertex{T, U}}
+    V::Vector{RootVertex{T, U}}
 end
 function Root(
-        se::SingularEdge{T}, se_classification_dict::Dict{SingularEdge{T}, Complex{Int64}},
-        sg::SuperGraph{T, U}
+        re::RootEdge{T, U}, re_classification_dict::Dict{RootEdge{T, U}, Complex{Int64}},
+        rg::RootGraph{T, U}
     ) where {T, U}
-    @assert haskey(se_classification_dict, se)
+    @assert haskey(re_classification_dict, re)
     return Root(
-        real(se_classification_dict[se]) == 1,
-        [getsingularvertex(sg, v) for v in vertices(se)],
+        real(re_classification_dict[re]) == 1,
+        [getrootvertex(rg, v) for v in vertices(re)],
     )
 end
 is_primary(r::Root) = r.is_primary
@@ -29,8 +29,8 @@ xs(r::Root) = x.(V(r))
 ys(r::Root) = y.(V(r))
 Base.length(r::Root) = length(r.V)
 function Eₕ(r::Root)
-    root_hvs = hypervertex.(V(r))
-    return [HyperEdge(id.(root_hvs)[i], id.(root_hvs)[i-1]) for i in 2:length(root_hvs)]
+    root_rvs = hypervertex.(V(r))
+    return [RootEdge(id.(root_rvs)[i], id.(root_rvs)[i-1]) for i in 2:length(root_rvs)]
 end
 
 """
@@ -40,7 +40,7 @@ Calculate the physical length of a root.
 """
 curve_length(r::Root) = sqrt.(diff(xs(r)) .^ 2 + diff(ys(r)) .^ 2) |> sum
 distance(r::Root) = sqrt((ys(r)[end] - ys(r)[1])^2 + (xs(r)[end] - xs(r)[1])^2)
-distance(v::SingularVertex, r::Root) = minimum(sqrt.((x(v) .- xs(r)) .^ 2 + (y(v) .- ys(r)) .^ 2))
+distance(v::RootVertex, r::Root) = minimum(sqrt.((x(v) .- xs(r)) .^ 2 + (y(v) .- ys(r)) .^ 2))
 tortuosity(r::Root) = curve_length(r) / distance(r)
 tortuosity(rs::Vector{<:Root}) = sum(tortuosity.(rs))
 function roughness(r::Root)

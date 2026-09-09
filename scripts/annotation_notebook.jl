@@ -57,11 +57,11 @@ md"## Data visualisation"
 begin
     filename_segments = "../data/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "../data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    sg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
+    rg = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
 end
 
 # ╔═╡ 3f40ee53-68ad-4bfa-a784-bbad4a366f02
-hypothesis_plot(sg)
+hypothesis_plot(rg)
 
 # ╔═╡ 7894d17f-b98c-4e19-8d3b-4fb690aaeb42
 md"## Solving"
@@ -76,17 +76,17 @@ end;
 # ╔═╡ 5355a78b-3bee-454e-a18b-0e6ac2d202b7
 # ╠═╡ show_logs = false
 model, time = @timed solve_rsa(
-    sg; optimizer = Gurobi.Optimizer, time_limit, hotstart_time, num_roots
+    rg; optimizer = Gurobi.Optimizer, time_limit, hotstart_time, num_roots
 );
 
 # ╔═╡ 797a5241-5c5c-47f9-a79c-c1ceec3add21
-roots = get_roots(sg, model);
+roots = get_roots(rg, model);
 
 # ╔═╡ 3ab99e7a-2e94-486c-8f25-6ca8aaad21b9
 r = rootplot(roots, title = "Time: $(round(time / 60, digits = 1)) min")
 
 # ╔═╡ 95fce8b3-1db5-4a61-b4e3-0e8e36181416
-annotation_dict = RootUntangling.get_annotation_dict(sg, roots);
+annotation_dict = RootUntangling.get_annotation_dict(rg, roots);
 
 # ╔═╡ 08de3104-630e-4792-836f-0ab11d324470
 @bind working_on Select(
@@ -99,7 +99,7 @@ annotation_dict = RootUntangling.get_annotation_dict(sg, roots);
 # ╔═╡ 2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 begin
     clicked
-    f = RootUntangling.annotation_plot(sg, annotation_dict)
+    f = RootUntangling.annotation_plot(rg, annotation_dict)
     ax = Axis(f[1, 1])
 
     if !@isdefined annotation_dict_updated
@@ -113,15 +113,15 @@ begin
             line_idx = findfirst(x -> x[1] isa Lines, elements)
             if !isnothing(line_idx)
                 line_element = elements[line_idx]
-                he_picked = line_element[1].arg2.value[]
+                re_picked = line_element[1].arg2.value[]
 
                 current_annotation_idx = findfirst(
-                    x -> x == working_on, annotation_dict[he_picked]
+                    x -> x == working_on, annotation_dict[re_picked]
                 )
                 if isnothing(current_annotation_idx)
-                    annotation_dict_updated = push!(annotation_dict[he_picked], working_on)
+                    annotation_dict_updated = push!(annotation_dict[re_picked], working_on)
                 else
-                    annotation_dict_updated = deleteat!(annotation_dict[he_picked], current_annotation_idx)
+                    annotation_dict_updated = deleteat!(annotation_dict[re_picked], current_annotation_idx)
                 end
             end
         end
