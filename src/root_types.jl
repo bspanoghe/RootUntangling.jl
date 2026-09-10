@@ -29,7 +29,7 @@ xs(r::Root) = x.(V(r))
 ys(r::Root) = y.(V(r))
 Base.length(r::Root) = length(r.V)
 function Eₕ(r::Root)
-    root_rvs = hypervertex.(V(r))
+    root_rvs = rootvertex.(V(r))
     return [RootEdge(id.(root_rvs)[i], id.(root_rvs)[i-1]) for i in 2:length(root_rvs)]
 end
 

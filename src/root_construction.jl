@@ -77,7 +77,7 @@ function separate_root_systems(rg::RootGraph, re_classification_dict::Dict, rs::
         found_exact_match = false
         for (i, primary_root) in enumerate(primary_roots)
 
-            pr_nb_vertices = reduce(vcat, V.([rg], hypervertex.(V(primary_root))))
+            pr_nb_vertices = reduce(vcat, V.([rg], rootvertex.(V(primary_root))))
             roots_match = [
                 rv_lat in pr_nb_vertices && !isnothing(findfirst(re -> src(re) == -3, edges(rv_lat))) &&
                     imag(

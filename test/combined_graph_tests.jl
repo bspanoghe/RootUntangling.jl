@@ -13,7 +13,7 @@ edge_data_dict = Dict(
 )
 
 pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
-rg = get_supergraph(pg);
+rg = get_rootgraph(pg);
 
 # # vertices
 @test length(V₀(rg)) == 3

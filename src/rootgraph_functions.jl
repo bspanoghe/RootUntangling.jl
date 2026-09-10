@@ -14,8 +14,8 @@ neighbor(rg::RootGraph{T, U}, rv::RootVertex{T, U}, re::RootEdge{T, U}) where {T
 )
 neighbors(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = [neighbor(rg, rv, re) for re in edges(rv)]
 
-inner_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neighbors(rg, Vₕ(v)) if !is_augmented(n)]) > 1]
-outer_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neighbors(rg, Vₕ(v)) if !is_augmented(n)]) == 1]
+inner_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neighbors(rg, v) if !is_augmented(n)]) > 1]
+outer_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neighbors(rg, v) if !is_augmented(n)]) == 1]
 
 # direction
 direction(rv::RootVertex{T, U}, re::RootEdge{T}) where {T, U} = src(re) == id(rv) ? 1 : -1

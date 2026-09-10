@@ -30,6 +30,7 @@ vertices(re::RootEdge) = (src(re), dst(re))
 
 is_augmented(re::RootEdge) = any(is_augmented.(vertices(re)))
 
+Base.sort(res::Vector{<:RootEdge}) = sort(res, by = vertices)
 Base.:(==)(re1::RootEdge, re2::RootEdge) = vertices(re1) == vertices(re2)
 Base.unique(res::Vector{<:RootEdge}) = unique(x -> vertices(x), res) # doesn't automatically use my equality operator :(
 Base.unique!(res::Vector{<:RootEdge}) = unique!(x -> vertices(x), res) # sad times
@@ -115,12 +116,17 @@ E₂(rv::RootVertex) = edges(rv) |> es -> [
     if !all(is_augmented.(es[[i, j]]))
 ]
 E₂(rg::RootGraph) = E₂.(V₀(rg)) |> x -> reduce(vcat, x, init = eltype(x)[])
-E₂(rg::RootGraph, re::RootEdge) = [
-    [re, nb_re]
-    for nb_re in unique(reduce(vcat, edges.(V(rg, re))))
-    if nb_re != re
+E₂(rv::RootVertex, re::RootEdge) = edges(rv) |> es -> [
+    sort([re, nb_re])
+    for nb_re in es
+    if re != nb_re && !all(is_augmented.([re, nb_re]))
 ]
-E₂(rv::RootVertex, re::RootEdge) = filter(c -> re in c, E₂(rv))
+E₂(rg::RootGraph, re::RootEdge) = [
+    sort([re, nb_re])
+    for nb_re in unique(reduce(vcat, edges.(V(rg, re))))
+    if nb_re != re && !all(is_augmented.([re, nb_re]))
+]
+
 
 # additional methods using mathematical syntax of V / V₀ and E / E₀
 V(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = [getrootvertex(rg, v) for v in vertices(re)]

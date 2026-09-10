@@ -3,7 +3,7 @@ import RootUntangling: Segment, MetaVertex, PreGraph, V₀, V₊, V,
     cosine_similarity, direction
 import RootUntangling.Makie: Figure
 
-# define supergraph
+# define rootgraph
 pg = PreGraph(
     [-1, 1, 2, 3, 4],
     [
@@ -19,7 +19,7 @@ pg = PreGraph(
         ]
     )
 );
-rg = get_supergraph(pg);
+rg = get_rootgraph(pg);
 
 # plotting
 @test graphplot(rg) isa Figure
@@ -91,6 +91,11 @@ res = E(rg)[[5, 7]] # edges with a 90 degree angle
 # # connections
 connections = E₂(rg);
 @test allunique(connections)
+
+issetequal(
+    unique(reduce(vcat, E₂.([rg], E₀(rg)))),
+    E₂(rg)
+)
 
 rv = V₀(rg)[1];
 @test issetequal(

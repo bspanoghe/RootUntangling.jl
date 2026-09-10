@@ -1,9 +1,9 @@
 """
-    get_supergraph(filename_segments::String, filename_vertices::String;
+    get_rootgraph(filename_segments::String, filename_vertices::String;
         dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1, [colnames...]
     )
 
-Create a supergraph from two files containing segment and vertex information.
+Create a rootgraph from two files containing segment and vertex information.
 
 # General keyword arguments
 - `dist_threshold::Real`: The distance below which branchpoints are considered to be the same and will be merged.
@@ -24,7 +24,7 @@ For the file containing edge/segment information.
 - `primary_score_colname`: NN-predicted probability of the segment containing a primary root.
 - `coords_colname`: The y and x coordinates of each pixel of the segment.
 """
-function get_supergraph(
+function get_rootgraph(
         filename_segments::String, filename_vertices::String;
         dist_threshold::Real, reverse_y::Bool,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
@@ -38,12 +38,12 @@ function get_supergraph(
         segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
         dist_colname, primary_score_colname, coords_colname
     )
-    rg = get_supergraph(pg)
+    rg = get_rootgraph(pg)
 
     return rg
 end
 
-function get_supergraph(pg::PreGraph)
+function get_rootgraph(pg::PreGraph)
     V₀ = [
         RootVertex(id(mv), RootEdge.(segments(pg, mv)), x(mv), y(mv), pred_split(mv))
         for mv in getmetavertices(pg)

@@ -1,8 +1,8 @@
 function get_re_classification_dict(rg::RootGraph, model::JuMP.Model)
-    ea = value.(model[:ea])
+    en = value.(model[:en])
     ep = value.(model[:ep])
 
-    re_classification_dict = [E(rg)[i] => round(Bool, value(ep[i])) + round(Bool, value(ea[i]) - value(ep[i])) * im for i in eachindex(E(rg))] |> Dict
+    re_classification_dict = [E(rg)[i] => round(Bool, value(ep[i])) + round(Bool, value(en[i]) > 0 - value(ep[i])) * im for i in eachindex(E(rg))] |> Dict
 
     return re_classification_dict
 end

@@ -45,13 +45,13 @@ are_overlapping(rg::RootGraph, re::RootEdge, r::Root) = (
     !all([isdisjoint(vs, vertices(r)) for vs in vertices(Vₕ(rg, re))])
 )
 
-# find hyperedges where multiple lateral roots overlap (and can switch)
+# find rootedges where multiple lateral roots overlap (and can switch)
 # primary root is not allowed to swap because it can break the assumption that only the primary root can split
 function find_overlaps(rg::RootGraph, model::JuMP.Model, roots)
     re_classification_dict = get_re_classification_dict(rg, model)
     overlap_res = filter(re -> imag(re_classification_dict[re]) > 1, Eₕ₀(rg))
 
-    # map all hyperedges to the roots they are part of
+    # map all rootedges to the roots they are part of
     # discarding roots of length 2 or smaller (switching does nothing)
     overlap_dict = [
         re => [r for r in roots if are_overlapping(rg, re, r) && length(r) > 2]
@@ -138,18 +138,18 @@ end
 
 # perform a crossing over between two roots
 function switch!(rg::RootGraph, re::RootEdge, r1::Root, r2::Root)
-    # get (not hyper) vertices of hyperedge
+    # get (not hyper) vertices of rootedge
     vs_re_src, vs_re_dst = vertices.(Vₕ(rg, re)) # `.` to get separately for both hypervertices
 
-    # find vertices in roots that match source of hyperedge
+    # find vertices in roots that match source of rootedge
     src_idx1 = findfirst(v -> v in vs_re_src, vertices(r1))
     src_idx2 = findfirst(v -> v in vs_re_src, vertices(r2))
 
-    # find vertices in roots that match destination of hyperedge (only need to look at vertices neighbouring source idx)
+    # find vertices in roots that match destination of rootedge (only need to look at vertices neighbouring source idx)
     dst_idx1 = get(vertices(r1), src_idx1 - 1, 0) in vs_re_dst ? src_idx1 - 1 : src_idx1 + 1
     dst_idx2 = get(vertices(r2), src_idx2 - 1, 0) in vs_re_dst ? src_idx2 - 1 : src_idx2 + 1
 
-    # skip switching if hyperedge is at an extremity of either root (switching does nothing)
+    # skip switching if rootedge is at an extremity of either root (switching does nothing)
     if any([idx in [1, length(r1)] for idx in [src_idx1, dst_idx1]]) || any([idx in [1, length(r2)] for idx in [src_idx2, dst_idx2]])
         @debug("`switch!` skipped")
         return nothing
@@ -158,7 +158,7 @@ function switch!(rg::RootGraph, re::RootEdge, r1::Root, r2::Root)
     # check if root orientations match
     orientation_match = (dst_idx1 - src_idx1) == (dst_idx2 - src_idx2)
 
-    # splice roots at hyperedge and switch a half of both
+    # splice roots at rootedge and switch a half of both
     if orientation_match
         tail1 = splice!(r1.V, dst_idx1:length(r1), r2.V[dst_idx2:end])
         splice!(r2.V, dst_idx2:length(V(r2)), tail1)

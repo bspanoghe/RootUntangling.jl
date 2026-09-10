@@ -15,7 +15,7 @@ begin
             filename_segments = "./data/ROI_$(roi_nr)/segment_info_with_coords.csv"
             filename_vertices = "./data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
 
-            rg = get_supergraph(filename_segments, filename_vertices; dist_threshold, pₛ, flip_y = true)
+            rg = get_rootgraph(filename_segments, filename_vertices; dist_threshold, pₛ, flip_y = true)
 
             connections_by_vertex = [
                 [

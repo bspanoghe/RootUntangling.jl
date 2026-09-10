@@ -42,7 +42,7 @@ function graphplot(
     return f
 end
 
-# ### With hyperedge classification
+# ### With rootedge classification
 function graphplot(
         rg::RootGraph, re_classification_dict::Dict{<:RootEdge, <:Complex}; standard_alpha = 1.0,
         augmented_alpha = 0.1, size = (600, 400), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
@@ -55,10 +55,10 @@ function graphplot(
                     (imag(re_classification_dict[re]) > 0) * RGBAf(0, 0, 1.0, alpha(re, standard_alpha, augmented_alpha)),
                 3
             )
-            for re in Eₕ(rg)
+            for re in E(rg)
         ] |> x -> reduce(vcat, x),
         :linewidth => [
-            fill(abs(re_classification_dict[re]), 3) for re in Eₕ(rg)
+            fill(abs(re_classification_dict[re]), 3) for re in E(rg)
         ] |> x -> reduce(vcat, x)
     )
     classification_vertex_kwargs = Dict(

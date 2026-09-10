@@ -13,8 +13,8 @@ playground_dir = "playground"
 difficulty = "baby"
 validation_dir = "validation/$(difficulty)"
 
-directory = validation_dir
-roi_nr = 1
+directory = playground_dir
+roi_nr = 4
 
 # read data
 
@@ -26,16 +26,16 @@ begin
 
     filename_segments = "./data/$(directory)/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "./data/$(directory)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    rg_full = get_supergraph(filename_segments, filename_vertices; dist_threshold, reverse_y)
+    rg_full = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y)
 
     graphplot(rg_full)
 end
 
 begin
     min_vertices = 5
-    y_threshold = 1000
+    y_threshold = -1000
 
-    rgs = get_subgraphs(rg_full; pₛ, nₕ_min) |>
+    rgs = get_subgraphs(rg_full) |>
         rgs -> filter(rg -> length(rg) > min_vertices, rgs) |>
         rgs -> filter(rg -> minimum(y.(V₀(rg))) > y_threshold, rgs) |>
         rgs -> sort(rgs, by = rg -> mean(x.(V₀(rg))));
@@ -44,7 +44,7 @@ begin
     ax_multi = Axis(f_multi[1, 1]; aspect = DataAspect())
     
     ls = [
-        lines!(ax_multi, rg, Eₕ₀(rg), color = Makie.HSV(i / length(rgs) * 360, 1, 1))
+        lines!(ax_multi, rg, E₀(rg), color = Makie.HSV(i / length(rgs) * 360, 1, 1))
         for (i, rg) in enumerate(rgs)
     ]
     Legend(f_multi[1, 2], ls, string.(1:length(ls)))
@@ -52,7 +52,7 @@ begin
     f_multi
 end
 
-annotating = true
+annotating = false
 if annotating
     root_systems = get_root_systems(rgs, ones(Int64, length(rgs)), optimizer = Gurobi.Optimizer,
         time_limit = 13*60, hotstart_time = 2*60, ρₒ_base = 4.0
@@ -63,21 +63,23 @@ if annotating
     write_annotation("results/$(directory)/ROI_$(roi_nr).txt", rg_full, rgs, root_systems)
 end
 
-f_ann = annotation_plot(rg_full, root_systems, size = (1600, 900))
+# f_ann = annotation_plot(rg_full, root_systems, size = (1600, 900))
 
 subidx = 1
 rg = rgs[subidx]
-hypothesis_plot(rg)
+graphplot(rg)
 
 begin
     model, time = @timed solve_rsa(
-        rg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 60, hotstart_time = 60,
-        num_roots = 1, ρₒ_base = 4.0
+        rg; optimizer = Gurobi.Optimizer, add_momentum = false, time_limit = 60, hotstart_time = 0,
+        num_roots = 1, ρₒ_base = 4.0, ρₐ = 1e-3
     )
-
-    roots = get_roots(rg, model);
-    roots_new = greedy_switch(rg, model, roots)
+    graphplot(rg, get_re_classification_dict(rg, model))
 end
+
+roots = get_roots(rg, model);
+roots_new = greedy_switch(rg, model, roots)
+
 
 r1 = rootplot(roots, size = (600, 600), title = "Time: $(round(time / 60, digits = 1)) min")
 r2 = rootplot(roots_new, size = (600, 600), title = "Time: $(round(time / 60, digits = 1)) min")
@@ -86,11 +88,10 @@ save(homedir() * "/Downloads/test1.svg", r1)
 save(homedir() * "/Downloads/test2.svg", r2)
 
 # NN predictions
-
-plot(
-    rgs[subidx], size = (800, 800),
-    edge_kwargs = Dict(:color => [HSV(0, 1, pred_primary(re)) for re in Eₕ(rgs[subidx])] |> x -> reshape(x, 1, :)),
-    vertex_kwargs = Dict(:color => [HSV(120, 1, pred_split(rv)) for rv in Vₕ(rgs[subidx])])
+import .Makie: HSV
+lines(
+    rgs[subidx], E₀(rgs[subidx]),
+    color = [fill(HSV(0, 1, pred_primary(re)), 3) for re in E₀(rgs[subidx])] |> x -> reduce(vcat, x)
 )
 savefig(homedir() * "\\Downloads\\wa.svg")
 
