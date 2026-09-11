@@ -33,7 +33,6 @@ function solve_rsa(
 
     # check for NN prediction data #! remove for final version
     NN_pred = pred_primary(E₀(rg)[1]) |> !ismissing
-    @debug typeof(!NN_pred)
 
     # name special vertices
     vₐ = V₊(rg)[1]
@@ -53,11 +52,10 @@ function solve_rsa(
     @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
     @variable(model, vn[1:n_v], Int, lower_bound = 0, upper_bound = 3) # number of roots in vertex #! ub
 
-    # @variable(model, ea[1:n_e], Bin) # is edge active #!
+    @variable(model, ea[1:n_e], Bin) # is edge active
     @variable(model, ep[1:n_e], Bin) # is the edge part of the primary root
     @variable(model, en[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge #! ub
     @variable(model, e₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction #! ub
-    @variable(model, e₋[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following negative direction #! ub
 
     add_momentum && @variable(model, f[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in connection #! ub
 
@@ -65,7 +63,7 @@ function solve_rsa(
     vn2f = Dict([V₀(rg)[i] => vn[i] for i in eachindex(V₀(rg))])
     vp2f = Dict([V₀(rg)[i] => vp[i] for i in eachindex(V₀(rg))])
 
-    # ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
+    ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
     ep2f = Dict([E(rg)[i] => ep[i] for i in eachindex(E(rg))])
     en2f = Dict([E(rg)[i] => en[i] for i in eachindex(E(rg))])
     e₊2f = Dict([E(rg)[i] => e₊[i] for i in eachindex(E(rg))])
@@ -83,18 +81,23 @@ function solve_rsa(
         ) +
         # standard rootedges should be active
         sum(
+            ea2f[e] * log(ρₕ / (1 - ρₕ))
+            for e in E₀(rg)
+        ) + 
+        # but not TOO many #!
+        -0.75 * sum(
             en2f[e] * log(ρₕ / (1 - ρₕ)) #!
             for e in E₀(rg)
-        )
+        ) +
         # gravitropy (needs to be split up into two sums to remain a linear objective)
-        # sum(
-        #     e₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
-        #     for e in E₀(rg)
-        # ) +
-        # sum(
-        #     (ea2f[e] - e₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
-        #     for e in E₀(rg)
-        # )
+        sum(
+            e₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
+        ) +
+        sum(
+            (en2f[e] - e₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
+        )
     )
 
     # similar angles
@@ -134,7 +137,7 @@ function solve_rsa(
         # It has equal incoming and outgoing roots
         @constraint(model, sum((e₊2f[e] - (en2f[e] - e₊2f[e])) * direction(v, e) for e in E(v)) == 0)
         # The amount of roots passing through equals those in the sum of its connections
-        # add_momentum && @constraint(model, vn2f[v] == sum(c2f[c] for c in E₂(v)))
+        add_momentum && @constraint(model, vn2f[v] == sum(c2f[c] for c in E₂(v)))
 
         # For all of its standard edges:
         for e in E₀(v)
@@ -145,15 +148,21 @@ function solve_rsa(
 
     # ### For any edge:
     for e in E(rg)
+        # It can only be classified as active if it contains roots
+        @constraint(model, ea2f[e] <= en2f[e])
         # It can only be classified as primary if it contains roots
         @constraint(model, ep2f[e] <= en2f[e])
+        # The amount of roots in positive direction is no larger than the amount of total roots
+        @constraint(model, e₊2f[e] <= en2f[e])
     end
 
     # ### For a connection:
-    # add_momentum && for c in connections
-    #     # It is active => its edges are active
-    #     @constraint(model, sum(ea2f[e] for e in c) - 1 <= c2f[c])
-    # end
+    add_momentum && for c in connections
+        # It is active => its edges are active
+        # @constraint(model, sum(ea2f[e] for e in c) - 1 <= c2f[c])
+        # It is active => Its edges have the same classification
+        # @constraint(model, ep2f[c[1]] == ep2f[c[2]])
+    end
 
     # ## Special vertices
 

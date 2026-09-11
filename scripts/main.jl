@@ -28,11 +28,11 @@ begin
     filename_vertices = "./data/$(directory)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
     rg_full = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y)
 
-    graphplot(rg_full)
+    graphplot(rg_full, augmented_alpha = 0.01)
 end
 
 begin
-    min_vertices = 5
+    min_vertices = 20
     y_threshold = -1000
 
     rgs = get_subgraphs(rg_full) |>
@@ -71,11 +71,38 @@ graphplot(rg)
 
 begin
     model, time = @timed solve_rsa(
-        rg; optimizer = Gurobi.Optimizer, add_momentum = false, time_limit = 60, hotstart_time = 0,
-        num_roots = 1, ρₒ_base = 4.0, ρₐ = 1e-3
+        rg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 60, hotstart_time = 0,
+        num_roots = 2, ρₐ = 0.01, ρₘ_max = 0.9
     )
-    graphplot(rg, get_re_classification_dict(rg, model))
+    cd = get_re_classification_dict(rg, model)
+    f_g = graphplot(rg, cd, augmented_alpha = 0.3, size = (250, 500))
+
+    annotate_that_thang = false
+    if annotate_that_thang
+        f_g = graphplot(rg, cd, augmented_alpha = 0.3, size = (1000, 2000))
+        nc = RootUntangling.get_en_dict(rg, model)
+        pc = RootUntangling.get_polarity_dict(rg, model)
+        annotation_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in E₀(rg)]
+        annotation_texts = [
+            "($(pc[re]) / $(nc[re] - pc[re]))"
+            for re in E₀(rg)
+        ]
+        annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :red, shrink = (0, 0), fontsize = 8)
+
+        annotation_coords = [(x(rv), y(rv)) for rv in V₀(rg)]
+        annotation_texts = string.(id.(V₀(rg)))
+        annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :green, shrink = (0, 0), fontsize = 8)
+    else
+        f_g = graphplot(rg, cd, augmented_alpha = 0.3, size = (250, 500))
+    end
+
+    f_g
 end
+save(homedir() * "/Downloads/wwawa.svg", f_g)
+
+
+values(cd) |> sum
+length(rg)
 
 roots = get_roots(rg, model);
 roots_new = greedy_switch(rg, model, roots)

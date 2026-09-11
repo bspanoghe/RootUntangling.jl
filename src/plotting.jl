@@ -27,12 +27,12 @@ function graphplot!(
     ] |> x -> reduce(vcat, x)
 
     lines!(ax, rg, E(rg); color, edge_kwargs...)
-    scatter!(ax, V(rg); color = :grey, markersize = 8, vertex_kwargs...)
+    scatter!(ax, V(rg); color = :grey, markersize = 5, vertex_kwargs...)
 end
 
 function graphplot(
         rg::RootGraph; standard_alpha = 1.0, augmented_alpha = 0.05, 
-        size = (600, 400), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
+        size = (600, 600), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
@@ -63,7 +63,7 @@ function graphplot(
     )
     classification_vertex_kwargs = Dict(
         :color => :grey,
-        :markersize => 8,
+        :markersize => 5,
     )
 
     edge_kwargs = merge(edge_kwargs, classification_edge_kwargs)

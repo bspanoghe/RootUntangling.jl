@@ -30,7 +30,7 @@ angle(rg::RootGraph{T, U}, re::RootEdge{T, U}; reverse_order::Bool = false) wher
 )
 
 cosine_similarity(rg::RootGraph{T, U}, re1::RootEdge{T, U}, re2::RootEdge{T, U}, v::T) where {T, U} = (
-    cos(-((angle(rg, e, reverse_order = (v == vertices(e)[1])) for e in [re1, re2])...)) # ensure angle of edge is calculated according to same common vertex as starting point
+    cos(-((angle(rg, e, reverse_order = (v == src(e))) for e in [re1, re2])...)) # ensure angle of edge is calculated according to same common vertex as starting point
 )
 cosine_similarity(rg::RootGraph{T, U}, re::RootEdge{T, U}, α; reverse_order::Bool = false) where {T, U} = (
     cos(angle(rg, re; reverse_order) - α)

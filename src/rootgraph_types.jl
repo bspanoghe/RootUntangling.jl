@@ -111,7 +111,7 @@ E(rg::RootGraph) = [E₊(rg); E₀(rg)]
 Base.length(rg::RootGraph) = length(V₀(rg))
 
 E₂(rv::RootVertex) = edges(rv) |> es -> [
-    [es[i], es[j]]
+    sort([es[i], es[j]])
     for i in 1:length(es) for j in i+1:length(es)
     if !all(is_augmented.(es[[i, j]]))
 ]
