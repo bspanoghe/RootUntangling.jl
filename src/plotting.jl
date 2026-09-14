@@ -178,7 +178,10 @@ function annotation_plot(sg::SuperGraph, root_system::Vector{<:Vector{<:Root}};
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-
+    
+    graphplot!(
+        ax, sg, standard_alpha = 0.5, augmented_alpha = 0.0, vertex_kwargs = Dict(:markersize => 3.0)
+    )
     rootplot!(ax, root_system; edge_kwargs...)
     add_annotation!(ax, sg, Eₕ₀(sg); fontsize)
 
