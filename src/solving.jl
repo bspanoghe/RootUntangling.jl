@@ -1,6 +1,6 @@
 """
     solve_rsa(
-        rg::RootGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        rg::RootGraph; optimizer, time_limit = missing, hotstart_time = 0,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.95, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi/2, ϵ = 1e-5
     )
 
@@ -10,7 +10,6 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 
 # General keyword arguments
 - `optimizer`: The JuMP.jl-compatible ILP optimizer to use.
-- `add_momentum`: Minimize angle differences between successive pieces of a root?
 - `time_limit`: Time limit of the solver in seconds.
 - `hotstart_time`: Time limit of hotstart in seconds. Setting to 0 will disable hotstarting.
 - `num_roots`: The amount of root systems present in the graph.
@@ -24,7 +23,7 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
 function solve_rsa(
-        rg::RootGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        rg::RootGraph; optimizer, time_limit = missing,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = exp(1),
         α_down = -pi / 2, ϵ = 1e-3
     )
@@ -47,17 +46,19 @@ function solve_rsa(
 
     n_v = length(V₀(rg))
     n_e = length(E(rg))
-    add_momentum && (n_c = length(connections))
+    n_c = length(connections)
 
-    @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
-    @variable(model, vn[1:n_v], Int, lower_bound = 0, upper_bound = 3) # number of roots in vertex #! ub
+    #! upper bounds
+    @variable(model, vn[1:n_v], Int, lower_bound = 0, upper_bound = 3) # number of roots in vertex 
+    @variable(model, vp[1:n_v], Int, lower_bound = 0, upper_bound = 3) # number of primary roots in vertex
 
     @variable(model, ea[1:n_e], Bin) # is edge active
-    @variable(model, ep[1:n_e], Bin) # is the edge part of the primary root
-    @variable(model, en[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge #! ub
-    @variable(model, e₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction #! ub
+    @variable(model, en[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge
+    @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of primary roots in edge
+    @variable(model, e₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
 
-    add_momentum && @variable(model, f[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in connection #! ub
+    @variable(model, f[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in connection
+    @variable(model, fp[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of primary edges in connection
 
     # connect model variables to graph's edges
     vn2f = Dict([V₀(rg)[i] => vn[i] for i in eachindex(V₀(rg))])
@@ -68,7 +69,8 @@ function solve_rsa(
     en2f = Dict([E(rg)[i] => en[i] for i in eachindex(E(rg))])
     e₊2f = Dict([E(rg)[i] => e₊[i] for i in eachindex(E(rg))])
 
-    add_momentum && (c2f = Dict([connections[i] => f[i] for i in eachindex(connections)]))
+    c2f = Dict([connections[i] => f[i] for i in eachindex(connections)])
+    cp2f = Dict([connections[i] => f[i] for i in eachindex(connections)])
 
     # define objective
     @objective(
@@ -85,7 +87,7 @@ function solve_rsa(
             for e in E₀(rg)
         ) + 
         # but not TOO many #!
-        -0.75 * sum(
+        -0.5 * sum(
             en2f[e] * log(ρₕ / (1 - ρₕ)) #!
             for e in E₀(rg)
         ) +
@@ -97,26 +99,20 @@ function solve_rsa(
         sum(
             (en2f[e] - e₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
+        ) + 
+        # angle differences
+        sum(
+            c2f[c] * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
+            for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
         )
     )
-
-    # similar angles
-    if add_momentum
-        set_objective_function(
-            model,
-            objective_function(model) + sum(
-                c2f[c] * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
-                for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
-            )
-        )
-    end
 
     # NN pred
     if NN_pred
         set_objective_function(
             model,
             objective_function(model) + sum(
-                ep2f[e] * log(ρₙₙ(e; ρₙₙ_max, ϵ) / (1 - ρₙₙ(e; ρₙₙ_max, ϵ)))
+                ep2f[e] * log(ρₙₙ(e; ρₙₙ_max, ϵ) / (1 - ρₙₙ(e; ρₙₙ_max, ϵ))) #! stacks w num of primary roots
                 for e in E₀(rg)
             )
         )
@@ -128,21 +124,21 @@ function solve_rsa(
 
     # ### For a standard vertex:
     for v in V₀(rg)
-        # It can only be classified as primary if it contains roots
+        # It can only contains as many primary roots as it contains roots
         @constraint(model, vp2f[v] <= vn2f[v])
         # it contains n roots ⇔ it is connected to edges summing to 2n roots (n incoming + n outgoing)
         @constraint(model, 2 * vn2f[v] == sum(en2f[e] for e in E(v)))
-        # It is an active primary vertex ⇔ it is connected to two active primary edges
+        # it contains n primary roots ⇔ it is connected to primary edges summing to 2n roots (n incoming + n outgoing)
         @constraint(model, 2 * vp2f[v] == sum(ep2f[e] for e in E(v)))
         # It has equal incoming and outgoing roots
         @constraint(model, sum((e₊2f[e] - (en2f[e] - e₊2f[e])) * direction(v, e) for e in E(v)) == 0)
         # The amount of roots passing through equals those in the sum of its connections
-        add_momentum && @constraint(model, vn2f[v] == sum(c2f[c] for c in E₂(v)))
+        @constraint(model, vn2f[v] == sum(c2f[c] for c in E₂(v)))
 
         # For all of its standard edges:
         for e in E₀(v)
             # it contains as many roots as the sum of its connections
-            add_momentum && @constraint(model, en2f[e] == sum(c2f[c] for c in E₂(v, e)))
+            @constraint(model, en2f[e] == sum(c2f[c] for c in E₂(v, e)))
         end
     end
 
@@ -150,19 +146,17 @@ function solve_rsa(
     for e in E(rg)
         # It can only be classified as active if it contains roots
         @constraint(model, ea2f[e] <= en2f[e])
-        # It can only be classified as primary if it contains roots
+        # The amount of primary roots is no larger than the amount of total roots
         @constraint(model, ep2f[e] <= en2f[e])
         # The amount of roots in positive direction is no larger than the amount of total roots
         @constraint(model, e₊2f[e] <= en2f[e])
     end
 
     # ### For a connection:
-    add_momentum && for c in connections
-        # It is active => its edges are active
-        # @constraint(model, sum(ea2f[e] for e in c) - 1 <= c2f[c])
+    # for c in connections
         # It is active => Its edges have the same classification
         # @constraint(model, ep2f[c[1]] == ep2f[c[2]])
-    end
+    # end
 
     # ## Special vertices
 
@@ -193,25 +187,6 @@ function solve_rsa(
         @constraint(model, sum(ep2f[e] for e in E(vₐ)) == num_roots)
         # The disappearance vertex is connected to the primary root with one edge per root
         @constraint(model, sum(ep2f[e] for e in E(vₑ)) == num_roots)
-    end
-
-    # # Hotstart
-
-    if (hotstart_time > 0) && add_momentum
-        @info "Running hotstart"
-        start_model = solve_rsa(rg; optimizer, add_momentum = false, time_limit = hotstart_time,
-            num_roots, ρₐ, ρₕ, ρₘ_max, ρₙₙ_max, ρᵧ_max, ρₒ_base, α_down, ϵ)
-
-        vars = all_variables(start_model)
-        sols = value.(vars)
-        for (start_var, start_sol) in zip(vars, sols)
-            varname = JuMP.name(start_var)
-            isempty(varname) && continue
-            var_current = variable_by_name(model, varname)
-            if var_current !== nothing
-                set_start_value(var_current, start_sol)
-            end
-        end
     end
 
     # # extra solver options
