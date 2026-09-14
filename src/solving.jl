@@ -135,8 +135,16 @@ function solve_rsa(
         # It has an incoming and an outgoing edge
         @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e])) * polarity(e, v) for e in E(v)) == 0)
 
-        # It is active ⇔ It has one active connection
-        add_momentum && @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
+        if add_momentum
+            # It is active ⇔ It has one active connection
+            @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
+            
+            # For all its edges:
+            for e in E(v)
+                # It is active ⇔ One connection containing this vertex and edge is active
+                @constraint(model, ea2f[e] == sum(c2f[c] for c in E₂(v, e)))
+            end
+        end
     end
 
     # ### For any edge:
@@ -144,12 +152,6 @@ function solve_rsa(
         # It can only be classified if active
         @constraint(model, ea2f[e] >= ep2f[e])
         @constraint(model, ea2f[e] >= e₊2f[e])
-    end
-
-    # ### For a connection:
-    add_momentum && for c in connections
-        # It is active => its edges are active
-        @constraint(model, sum(ea2f[e] for e in c) - 1 <= c2f[c])
     end
 
     # ### For a hyperedge:
