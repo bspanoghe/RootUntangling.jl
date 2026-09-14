@@ -11,6 +11,8 @@ Base.unique!(aes::Vector{<:AbstractEdge}) = unique!(x -> vertices(x), aes) # sad
 
 Base.show(io::IO, ae::AbstractEdge) = print(io, "$(typeof(ae).name.name)$(vertices(ae))")
 Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.name)$(vertices.(aes))")
+Base.sort(aes::Vector{<:AbstractEdge}) = sort(aes, by = vertices)
+
 
 """
     HyperEdge{T, U}
@@ -185,13 +187,16 @@ E(sg::SuperGraph) = [E₊(sg); E₀(sg)]
 Base.length(sg::SuperGraph) = length(Vₕ₀(sg))
 
 E₂(sv::SingularVertex) = [
-    [edges(sv)[i], edges(sv)[j]]
+    sort([edges(sv)[i], edges(sv)[j]])
         for i in eachindex(edges(sv)) for j in eachindex(edges(sv))
         if (i > j) && !all(is_augmented.(edges(sv)[[i, j]]))
 ]
 E₂(sg::SuperGraph) = E₂.(V₀(sg)) |> x -> reduce(vcat, x, init = eltype(x)[])
-E₂(sv::SingularVertex, se::SingularEdge) = [c for c in E₂(sv) if se in c]
-
+E₂(sv::SingularVertex, se::SingularEdge) = edges(sv) |> ses -> [
+    sort([se, nb_se])
+    for nb_se in ses
+    if se != nb_se && !all(is_augmented.([se, nb_se]))
+]
 # additional methods using mathematical syntax of V / V₀ / Vₕ / Vₕ₀ and E / E₀ / Eₕ / Eₕ₀
 V(sg::SuperGraph{T, U}, se::SingularEdge{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(se)]
 V(sg::SuperGraph{T, U}, hv::HyperVertex{T, U}) where {T, U} = [getsingularvertex(sg, v) for v in vertices(hv)]
