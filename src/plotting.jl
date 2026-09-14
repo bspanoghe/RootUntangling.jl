@@ -44,9 +44,12 @@ end
 
 # ### With rootedge classification
 function graphplot(
-        rg::RootGraph, re_classification_dict::Dict{<:RootEdge, <:Complex}; standard_alpha = 1.0,
+        rg::RootGraph, model::JuMP.Model; standard_alpha = 1.0,
         augmented_alpha = 0.1, size = (600, 400), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     )
+
+    re_classification_dict = get_re_classification_dict(rg, model)
+    en_dict = get_en_dict(rg, model)
 
     classification_edge_kwargs = Dict(
         :color => [
@@ -58,13 +61,10 @@ function graphplot(
             for re in E(rg)
         ] |> x -> reduce(vcat, x),
         :linewidth => [
-            fill(abs(re_classification_dict[re]), 3) for re in E(rg)
+            fill(en_dict[re], 3) for re in E(rg)
         ] |> x -> reduce(vcat, x)
     )
-    classification_vertex_kwargs = Dict(
-        :color => :grey,
-        :markersize => 5,
-    )
+    classification_vertex_kwargs = Dict(:color => :grey)
 
     edge_kwargs = merge(edge_kwargs, classification_edge_kwargs)
     vertex_kwargs = merge(vertex_kwargs, classification_vertex_kwargs)
