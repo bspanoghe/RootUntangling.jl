@@ -14,7 +14,7 @@ difficulty = "baby"
 validation_dir = "validation/$(difficulty)"
 
 directory = playground_dir
-roi_nr = 4
+roi_nr = 1
 
 # read data
 
@@ -71,20 +71,17 @@ graphplot(rg)
 
 begin
     model, time = @timed solve_rsa(
-        rg; optimizer = Gurobi.Optimizer, add_momentum = true, time_limit = 60, hotstart_time = 0,
-        num_roots = 2, ρₐ = 0.01, ρₘ_max = 0.9
+        rg; optimizer = HiGHS.Optimizer, time_limit = 60,
+        num_roots = 1
     )
-    cd = get_re_classification_dict(rg, model)
-    f_g = graphplot(rg, cd, augmented_alpha = 0.3, size = (250, 500))
 
     annotate_that_thang = false
     if annotate_that_thang
-        f_g = graphplot(rg, cd, augmented_alpha = 0.3, size = (1000, 2000))
-        nc = RootUntangling.get_en_dict(rg, model)
-        pc = RootUntangling.get_polarity_dict(rg, model)
+        f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1000, 2000))
+        rd = get_result_dict(rg, model)
         annotation_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in E₀(rg)]
         annotation_texts = [
-            "($(pc[re]) / $(nc[re] - pc[re]))"
+            "($(rd[re][:e₊]) / $(rd[re][:e₋]))"
             for re in E₀(rg)
         ]
         annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :red, shrink = (0, 0), fontsize = 8)
@@ -93,16 +90,12 @@ begin
         annotation_texts = string.(id.(V₀(rg)))
         annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :green, shrink = (0, 0), fontsize = 8)
     else
-        f_g = graphplot(rg, cd, augmented_alpha = 0.3, size = (250, 500))
+        f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (250, 500), vertex_kwargs = Dict(:markersize => 2))
     end
 
     f_g
 end
 save(homedir() * "/Downloads/wwawa.svg", f_g)
-
-
-values(cd) |> sum
-length(rg)
 
 roots = get_roots(rg, model);
 roots_new = greedy_switch(rg, model, roots)
