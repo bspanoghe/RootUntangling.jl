@@ -13,7 +13,7 @@ export get_pregraph # data to graph
 export src, dst, vertices, rootedge, segment_id, width, pred_primary, is_augmented, are_connected # edges
 export id, edges, x, y, pred_split, xs, ys, rootvertex # vertices
 export V₀, V₊, V, E₀, E₊, E, E₂, neighbors # graphs
-export get_re_classification_dict, get_rv_classification_dict # get results
+export get_result_dict # get results
 
 using JuMP, Statistics, GLMakie, GLMakie.Colors
 
@@ -26,7 +26,7 @@ include("rootgraph_functions.jl"); # rootgraph functions needed for the model
 include("rootgraph_construction.jl"); # construct rootgraph from preliminary graph
 include("rootgraph_clustering.jl"); # cluster disconnected graphs in a rootgraph
 include("solving.jl"); # solve problem based on rootgraph
-include("classification_extraction.jl"); # get classifications from model
+include("result_extraction.jl"); # get classifications from model
 include("root_types.jl"); # type to represent resulting roots
 include("root_construction.jl"); # get the roots
 include("root_postprocessing.jl"); # postprocessing on roots

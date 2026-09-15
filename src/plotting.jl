@@ -48,20 +48,19 @@ function graphplot(
         augmented_alpha = 0.1, size = (600, 400), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     )
 
-    re_classification_dict = get_re_classification_dict(rg, model)
-    en_dict = get_en_dict(rg, model)
+    rd = get_result_dict(rg, model)
 
     classification_edge_kwargs = Dict(
         :color => [
             fill(
-                (real(re_classification_dict[re]) > 0) * RGBAf(1.0, 0, 0, alpha(re, standard_alpha, augmented_alpha)) + 
-                    (imag(re_classification_dict[re]) > 0) * RGBAf(0, 0, 1.0, alpha(re, standard_alpha, augmented_alpha)),
+                rd[re][:ep] * RGBAf(1.0, 0, 0, alpha(re, standard_alpha, augmented_alpha)) + 
+                    rd[re][:el] * RGBAf(0, 0, 1.0, alpha(re, standard_alpha, augmented_alpha)),
                 3
             )
             for re in E(rg)
         ] |> x -> reduce(vcat, x),
         :linewidth => [
-            fill(en_dict[re], 3) for re in E(rg)
+            fill(rd[re][:en], 3) for re in E(rg)
         ] |> x -> reduce(vcat, x)
     )
     classification_vertex_kwargs = Dict(:color => :grey)
