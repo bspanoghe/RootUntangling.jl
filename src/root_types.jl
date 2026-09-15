@@ -11,16 +11,6 @@ struct Root{T, U}
     is_primary::Bool
     V::Vector{RootVertex{T, U}}
 end
-function Root(
-        re::RootEdge{T, U}, re_classification_dict::Dict{RootEdge{T, U}, Complex{Int64}},
-        rg::RootGraph{T, U}
-    ) where {T, U}
-    @assert haskey(re_classification_dict, re)
-    return Root(
-        real(re_classification_dict[re]) == 1,
-        [getrootvertex(rg, v) for v in vertices(re)],
-    )
-end
 is_primary(r::Root) = r.is_primary
 V(r::Root) = r.V
 

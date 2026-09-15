@@ -6,14 +6,17 @@ Extract the roots from a graph `rg` and its solution contained in `model`.
 See also [`Root`](@ref).
 """
 function get_roots(rg::RootGraph, model::JuMP.Model)
-    re_classification_dict = get_re_classification_dict(rg, model)
-    polarity_classification_dict = get_polarity_classification_dict(rg, model)
-    active_edges = [e for e in E₀(rg) if abs(re_classification_dict[e]) > 0]
+    rd = get_result_dict(rg, model)
+
+    # get primary root(s)
+    pcd = round.(Int64, value.(model[:cp2f]))
+    connection_count_dict = Dict([c => pcd[c] for c in E₂(rg) if pcd[c] > 0])
+    remaining_connections = collect(values(connection_count_dict))
 
     roots = Root[]
-    while !isempty(active_edges)
-        current_root = Root(active_edges[1], re_classification_dict, rg)
-        deleteat!(active_edges, 1)
+    while !isempty(remaining_connections)
+        current_root = Root(true, V(remaining_connections[1][1]))
+        deleteat!(remaining_connections, 1)
 
         edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
         while !isnothing(edge_idx)
