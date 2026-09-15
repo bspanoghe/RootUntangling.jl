@@ -44,33 +44,28 @@ function solve_rsa(
     # define the model variables
     connections = E₂(rg)
 
-    n_v = length(V₀(rg))
     n_e = length(E(rg))
     n_c = length(connections)
 
     #! upper bounds
-    @variable(model, vn[1:n_v], Int, lower_bound = 0, upper_bound = 3) # number of roots in vertex 
-    @variable(model, vp[1:n_v], Int, lower_bound = 0, upper_bound = 3) # number of primary roots in vertex
-
     @variable(model, ea[1:n_e], Bin) # is edge active
-    @variable(model, en[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge
     @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of primary roots in edge
-    @variable(model, e₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
+    @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
+    @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of lateral roots in edge
+    @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
 
-    @variable(model, f[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in connection
-    @variable(model, fp[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of primary edges in connection
+    @variable(model, fp[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in primary connection
+    @variable(model, fl[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in lateral connection
 
     # connect model variables to graph's edges
-    vn2f = Dict([V₀(rg)[i] => vn[i] for i in eachindex(V₀(rg))])
-    vp2f = Dict([V₀(rg)[i] => vp[i] for i in eachindex(V₀(rg))])
-
     ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
     ep2f = Dict([E(rg)[i] => ep[i] for i in eachindex(E(rg))])
-    en2f = Dict([E(rg)[i] => en[i] for i in eachindex(E(rg))])
-    e₊2f = Dict([E(rg)[i] => e₊[i] for i in eachindex(E(rg))])
+    ep₊2f = Dict([E(rg)[i] => ep₊[i] for i in eachindex(E(rg))])
+    el2f = Dict([E(rg)[i] => el[i] for i in eachindex(E(rg))])
+    el₊2f = Dict([E(rg)[i] => el₊[i] for i in eachindex(E(rg))])
 
-    c2f = Dict([connections[i] => f[i] for i in eachindex(connections)])
-    cp2f = Dict([connections[i] => f[i] for i in eachindex(connections)])
+    cp2f = Dict([connections[i] => fp[i] for i in eachindex(connections)])
+    cl2f = Dict([connections[i] => fl[i] for i in eachindex(connections)])
 
     # define objective
     @objective(
@@ -78,7 +73,7 @@ function solve_rsa(
         Max,
         # appearance penalties
         sum(
-            en2f[e] * log(ρₐ / (1 - ρₐ))
+            (ep2f[e] + el2f[e]) * log(ρₐ / (1 - ρₐ))
             for e in E(vₐ)
         ) +
         # standard rootedges should be active
@@ -87,22 +82,22 @@ function solve_rsa(
             for e in E₀(rg)
         ) + 
         # but not TOO many #!
-        -0.5 * sum(
-            en2f[e] * log(ρₕ / (1 - ρₕ)) #!
+        -0.4 * sum(
+            (ep2f[e] + el2f[e]) * log(ρₕ / (1 - ρₕ)) #!
             for e in E₀(rg)
         ) +
         # gravitropy (needs to be split up into two sums to remain a linear objective)
         sum(
-            e₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            (ep₊2f[e] + el₊2f[e]) * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
         sum(
-            (en2f[e] - e₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            ((ep2f[e] + el2f[e]) - (ep₊2f[e] + el₊2f[e])) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # angle differences
         sum(
-            c2f[c] * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
+            (cp2f[c] + cl2f[c]) * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
             for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
         )
     )
@@ -124,55 +119,45 @@ function solve_rsa(
 
     # ### For a standard vertex:
     for v in V₀(rg)
-        # It can only contains as many primary roots as it contains roots
-        @constraint(model, vp2f[v] <= vn2f[v])
-        # it contains n roots ⇔ it is connected to edges summing to 2n roots (n incoming + n outgoing)
-        @constraint(model, 2 * vn2f[v] == sum(en2f[e] for e in E(v)))
-        # it contains n primary roots ⇔ it is connected to primary edges summing to 2n roots (n incoming + n outgoing)
-        @constraint(model, 2 * vp2f[v] == sum(ep2f[e] for e in E(v)))
-        # It has equal incoming and outgoing roots
-        @constraint(model, sum((e₊2f[e] - (en2f[e] - e₊2f[e])) * direction(v, e) for e in E(v)) == 0)
-        # The amount of roots passing through equals those in the sum of its connections
-        @constraint(model, vn2f[v] == sum(c2f[c] for c in E₂(v)))
-
         # For all of its standard edges:
-        for e in E₀(v)
+        for e in E(v)
             # it contains as many roots as the sum of its connections
-            @constraint(model, en2f[e] == sum(c2f[c] for c in E₂(v, e)))
+            @constraint(model, ep2f[e] == sum(cp2f[c] for c in E₂(v, e)))
+            @constraint(model, el2f[e] == sum(cl2f[c] for c in E₂(v, e)))
         end
+        # It has equal incoming and outgoing roots
+        @constraint(model, sum((ep₊2f[e] - (ep2f[e] - ep₊2f[e])) * direction(v, e) for e in E(v)) == 0)
+        @constraint(model, sum((el₊2f[e] - (el2f[e] - el₊2f[e])) * direction(v, e) for e in E(v)) == 0)
     end
 
     # ### For any edge:
     for e in E(rg)
         # It can only be classified as active if it contains roots
-        @constraint(model, ea2f[e] <= en2f[e])
-        # The amount of primary roots is no larger than the amount of total roots
-        @constraint(model, ep2f[e] <= en2f[e])
-        # The amount of roots in positive direction is no larger than the amount of total roots
-        @constraint(model, e₊2f[e] <= en2f[e])
-    end
+        @constraint(model, ea2f[e] <= (ep2f[e] + el2f[e]))
 
-    # ### For a connection:
-    # for c in connections
-        # It is active => Its edges have the same classification
-        # @constraint(model, ep2f[c[1]] == ep2f[c[2]])
-    # end
+        # The amount of roots in positive direction is no larger than the amount of total roots
+        @constraint(model, ep₊2f[e] <= ep2f[e])
+        @constraint(model, el₊2f[e] <= el2f[e])
+    end
 
     # ## Special vertices
 
     # The appearance vertex has no incoming edges (edges are either inactive or follow natural polarity)
-    @constraint(model, sum((en2f[e] - e₊2f[e]) for e in E(vₐ)) == 0)
+    @constraint(model, sum((ep2f[e] - ep₊2f[e]) for e in E(vₐ)) == 0)
+    @constraint(model, sum((el2f[e] - el₊2f[e]) for e in E(vₐ)) == 0)
     # The extinction vertex has no outgoing edges (edges are either inactive or opposite natural polarity)
-    @constraint(model, sum(e₊2f[e] for e in E(vₑ)) == 0)
+    @constraint(model, sum(ep₊2f[e] for e in E(vₑ)) == 0)
+    @constraint(model, sum(el₊2f[e] for e in E(vₑ)) == 0)
     # The splitting vertex has no incoming edges (edges are either inactive or follow natural polarity)
-    @constraint(model, sum((en2f[e] - e₊2f[e]) for e in E(vₛ)) == 0)
+    @constraint(model, sum((ep2f[e] - ep₊2f[e]) for e in E(vₛ)) == 0)
+    @constraint(model, sum((el2f[e] - el₊2f[e]) for e in E(vₛ)) == 0)
 
     # ## Prerequisite for division
 
     # A vertex can only split if it's part of the primary root
     for v in inner_vertices(rg) # outer nodes can never split
         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
-        @constraint(model, en2f[e_vₛ] <= vp2f[v]) #! only allows one split event in vertex (otherwise multiply right side by constant)
+        @constraint(model, el2f[e_vₛ] <= sum(cp2f[c] for c in E₂(v))) #! only allows one split event in vertex (otherwise multiply right side by constant)
     end
 
     # Primary root segments cannot form from division
