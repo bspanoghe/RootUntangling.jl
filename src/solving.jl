@@ -157,7 +157,7 @@ function solve_rsa(
     # A vertex can only split if it's part of the primary root
     for v in inner_vertices(rg) # outer nodes can never split
         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
-        @constraint(model, el2f[e_vₛ] <= sum(cp2f[c] for c in E₂(v))) #! only allows one split event in vertex (otherwise multiply right side by constant)
+        @constraint(model, el2f[e_vₛ] <= sum(ep2f[e] for e in E(v))) #! only allows one split event in vertex (otherwise multiply right side by constant)
     end
 
     # Primary root segments cannot form from division
