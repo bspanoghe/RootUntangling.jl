@@ -14,7 +14,7 @@ difficulty = "baby"
 validation_dir = "validation/$(difficulty)"
 
 directory = playground_dir
-roi_nr = 1
+roi_nr = 3
 
 # read data
 
@@ -75,7 +75,7 @@ begin
         num_roots = 1
     )
 
-    annotate_that_thang = false
+    annotate_that_thang = true
     if annotate_that_thang
         f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1000, 2000))
         rd = get_result_dict(rg, model)
@@ -97,7 +97,7 @@ begin
 end
 save(homedir() * "/Downloads/wwawa.svg", f_g)
 
-roots = get_roots(rg, model);
+roots = get_rootsystems(rg, model);
 roots_new = greedy_switch(rg, model, roots)
 
 
@@ -172,3 +172,112 @@ end
 f = RootUntangling.annotation_plot(rg, annotation_dict)
 DataInspector(f)
 f
+
+
+
+
+###########################################################################################################
+T, U = typeof(rg).parameters
+
+result_dict = get_result_dict(rg, model)
+
+# get all primary root(s)
+primaries = Root{T, U}[]
+
+c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp])))
+e₊_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep₊])))
+e₋_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep]) - value.(model[:ep₊])))
+# filter!(x -> x.second > 0, c_counts) #!
+
+while !isempty(c_counts)
+    root = grow_root!(c_counts, :primary)
+end
+
+# assign laterals that split to their primary root
+
+# assign laterals that appeared to their most probable primary root
+
+
+
+
+# get primary root(s)
+
+
+
+
+import RootUntangling: RootEdge
+
+function grow_root!(c_counts::Dict, e₊_counts::Dict, e₋_counts::Dict, rg::RootGraph, root_type::Symbol)
+    root_type ∈ [:primary, :lateral] || error("Root type should be primary or lateral")
+    
+    # start with a random active connection
+    c0 = findfirst(x -> x > 0, c_counts)
+    c_counts[c0] -= 1
+
+    # determine what directions are possible for the two edges
+    es = c0
+    follows_polarity = Bool[]
+    opposite_direction = allequal(src.(es)) || allequal(dst.(es)) # both edges point towards or away from shared vertex
+    if opposite_direction # edges require different polarity
+        if e₊_counts[es[1]] > 0 && e₋_counts[es[2]] > 0
+            append!(follows_polarity, [true, false])
+        else
+            append!(follows_polarity, [false, true])
+        end
+    else # edges require same polarity
+        if e₊_counts[es[1]] > 0 && e₊_counts[es[2]] > 0
+            append!(follows_polarity, [true, true])
+        else
+            append!(follows_polarity, [false, false])
+        end
+    end
+    
+    has_restarted = false
+    fullgrown = false
+    # until you can no longer append root segments in either direction:
+    while !fullgrown
+        # choose an edge at an end of the root
+        e_current = has_restarted ? es[1] : es[end]
+
+        # get its possible connections (if empty: start again from first root segment to go in other direction)
+        connections = E₂(rg, e_current)
+        if isempty(connections)
+            if has_restarted
+                fullgrown = true
+            else
+                has_restarted = true
+            end
+            continue #!
+        end
+
+        # filter on:
+        # - remaining amount 
+        # - edge2 != previous root segment
+        # - edge2 has a different direction from edge1
+        
+
+        cidx = findfirst(
+            is_valid_connection,
+            connections
+        )
+
+        # pick a random edge2: 
+            # add to root: 
+                # if first run, append to end of root
+                # if second run (going in other direction), append to start of root
+            # remove root from remaining roots in that direction
+            # remove connection
+        # make new edge1 and repeat from 2
+    end
+
+end
+
+function is_valid_connection(c, has_restarted, c_counts, es)
+    if has_restarted
+        (c_counts[c] > 0) &&
+        !(es[2] ∈ c) &&
+        follows_polarity[1] ? only(c[c != e_current]) : missing
+    else
+        c -> (c_counts[c] > 0) && !(es[end-1] ∈ c) && missing
+    end
+end
