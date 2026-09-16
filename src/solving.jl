@@ -54,8 +54,8 @@ function solve_rsa(
     @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of lateral roots in edge
     @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
 
-    @variable(model, fp[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in primary connection
-    @variable(model, fl[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in lateral connection
+    @variable(model, cp[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in primary connection
+    @variable(model, cl[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in lateral connection
 
     # connect model variables to graph's edges
     ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
@@ -64,8 +64,8 @@ function solve_rsa(
     el2f = Dict([E(rg)[i] => el[i] for i in eachindex(E(rg))])
     el₊2f = Dict([E(rg)[i] => el₊[i] for i in eachindex(E(rg))])
 
-    cp2f = Dict([connections[i] => fp[i] for i in eachindex(connections)])
-    cl2f = Dict([connections[i] => fl[i] for i in eachindex(connections)])
+    cp2f = Dict([connections[i] => cp[i] for i in eachindex(connections)])
+    cl2f = Dict([connections[i] => cl[i] for i in eachindex(connections)])
 
     # define objective
     @objective(
