@@ -1,32 +1,28 @@
 """
-    get_roots(rg::RootGraph, model::JuMP.Model)
+    get_rootsystems(rg::RootGraph, model::JuMP.Model)
 
-Extract the roots from a graph `rg` and its solution contained in `model`.
-
-See also [`Root`](@ref).
+Extract the rootsystems from a graph `rg` and its solution contained in `model`.
 """
-function get_roots(rg::RootGraph, model::JuMP.Model)
-    rd = get_result_dict(rg, model)
+function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
+    # get all primary root(s)
+    primaries = Root{T, U}[]
+
+    pcd = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp]))) # primary connection dict
+    connection_count_dict = Dict([c => pcd[c] for c in E₂(rg) if pcd[c] > 0])
+
+    while !isempty(connection_count_dict)
+        root = grow_root!(connection_count_dict, :primary)
+    end
+
+    # assign laterals that split to their primary root
+
+    # assign laterals that appeared to their most probable primary root
+
+
+
 
     # get primary root(s)
-    pcd = round.(Int64, value.(model[:cp2f]))
-    connection_count_dict = Dict([c => pcd[c] for c in E₂(rg) if pcd[c] > 0])
-    remaining_connections = collect(values(connection_count_dict))
 
-    roots = Root[]
-    while !isempty(remaining_connections)
-        current_root = Root(true, V(remaining_connections[1][1]))
-        deleteat!(remaining_connections, 1)
-
-        edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
-        while !isnothing(edge_idx)
-            grow!(current_root, active_edges[edge_idx], rg)
-            deleteat!(active_edges, edge_idx)
-            edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
-        end
-        correct_polarity!(rg, polarity_classification_dict, current_root)
-        push!(roots, current_root)
-    end
 
     if length(filter(r -> is_primary(r), roots)) == 1
         sort_root_system!(roots)
@@ -34,6 +30,22 @@ function get_roots(rg::RootGraph, model::JuMP.Model)
     else
         return separate_root_systems(rg, re_classification_dict, roots)
     end
+end
+
+function grow_root!(cd::Dict, root_type::Symbol)
+    root_type ∈ [:primary, :lateral] || error("Root type should be primary or lateral")
+
+    root = Root(root_type == :primary, V(remaining_connections[1][1]))
+    deleteat!(remaining_connections, 1)
+
+    edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
+    while !isnothing(edge_idx)
+        grow!(current_root, active_edges[edge_idx], rg)
+        deleteat!(active_edges, edge_idx)
+        edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
+    end
+    correct_polarity!(rg, polarity_classification_dict, current_root)
+    push!(roots, current_root)
 end
 
 are_connected(r::Root{T, U}, re::RootEdge{T, U}) where {T, U} = (

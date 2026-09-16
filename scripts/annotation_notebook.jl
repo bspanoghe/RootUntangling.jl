@@ -80,7 +80,7 @@ model, time = @timed solve_rsa(
 );
 
 # ╔═╡ 797a5241-5c5c-47f9-a79c-c1ceec3add21
-roots = get_roots(rg, model);
+roots = get_rootsystems(rg, model);
 
 # ╔═╡ 3ab99e7a-2e94-486c-8f25-6ca8aaad21b9
 r = rootplot(roots, title = "Time: $(round(time / 60, digits = 1)) min")

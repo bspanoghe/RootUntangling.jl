@@ -79,7 +79,7 @@ function get_root_systems(rgs::Vector{RootGraph{T, U}}, num_roots::Vector{<:Inte
             rg; optimizer, time_limit, num_roots = num_roots[i], kwargs...
         )
 
-        roots = get_roots(rg, model)
+        roots = get_rootsystems(rg, model)
         rss = greedy_switch(rg, model, roots)
 
         root_systems[i] = rss isa Vector{<:Root} ? [rss] : rss
