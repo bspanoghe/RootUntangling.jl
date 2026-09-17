@@ -43,13 +43,9 @@ function solve_rsa(
     # define the model variables
     connections = E₂(sg)
 
-    n_v = length(V₀(sg))
     n_e = length(E(sg))
     n_he = length(Eₕ₀(sg))
     n_c = length(connections)
-
-    @variable(model, va[1:n_v], Bin) # is vertex active (part of the root)
-    @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
 
     @variable(model, ea[1:n_e], Bin) # is the edge active (part of the root)
     @variable(model, ep[1:n_e], Bin) # is the edge part of the primary root
@@ -62,9 +58,6 @@ function solve_rsa(
     NN_pred && @variable(model, heₚ[1:n_he], Bin) # is this a primary hyperedge
 
     # connect model variables to graph's edges
-    va2f = Dict([V₀(sg)[i] => va[i] for i in eachindex(V₀(sg))])
-    vp2f = Dict([V₀(sg)[i] => vp[i] for i in eachindex(V₀(sg))])
-
     ea2f = Dict([E(sg)[i] => ea[i] for i in eachindex(E(sg))])
     ep2f = Dict([E(sg)[i] => ep[i] for i in eachindex(E(sg))])
     e₊2f = Dict([E(sg)[i] => e₊[i] for i in eachindex(E(sg))])
@@ -83,10 +76,10 @@ function solve_rsa(
             ea2f[e] * log(ρₐ / (1 - ρₐ))
                 for e in E(vₐ)
         ) +
-        # standard hyperedges should be active
+        # standard edge activity
             sum(
-            hea2f[he] * log(ρₕ / (1 - ρₕ))
-                for he in Eₕ₀(sg)
+            ea2f[e] * log(ρ₀(e; ρₒ_base, ϵ) / (1 - ρ₀(e; ρₒ_base, ϵ)))
+                for e in E₀(sg)
         ) +
         # similar angles
         sum(
@@ -108,12 +101,7 @@ function solve_rsa(
                     hep2f[he] * log(ρₙₙ(he; ρₙₙ_max, ϵ) / (1 - ρₙₙ(he; ρₙₙ_max, ϵ)))
                     for he in Eₕ₀(sg)
                 )
-        ) +
-            # overlap probability
-            sum(
-            va2f[v] * log(ρ₀(v; ρₒ_base, ϵ) / (1 - ρ₀(v; ρₒ_base, ϵ)))
-                for v in V₀(sg)
-        )
+        )            
     )
 
     # # define constraints
@@ -223,6 +211,11 @@ end
 # prevent probabilities from reaching 0 or 1
 bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
+# edge activity probability
+ρ₀(sg::SuperGraph, se::SingularEdge; ρₒ_base, ϵ) = ρₒ_base^(-order(sg, se)) |> p -> bound(p; ϵ)
+order(sv::SingularEdge) = id(sv) - vertices(hypervertex(sv))[1]
+order(sg::SuperGraph, se::SingularEdge) = maximum(order.(V(sg, se)))
+
 # change in angle probability
 ρₘ(sg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(sg, c..., id(v)) |> p -> bound(p; ϵ)
 
@@ -233,7 +226,3 @@ bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # NN pred primary probability
 ρₙₙ(he; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(he) |> p -> bound(p; ϵ)
-
-# root overlap probability
-ρ₀(sv::SingularVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(sv)) |> p -> bound(p; ϵ)
-order(sv::SingularVertex) = id(sv) - vertices(hypervertex(sv))[1]
