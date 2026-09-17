@@ -10,9 +10,7 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 
 # General keyword arguments
 - `optimizer`: The JuMP.jl-compatible ILP optimizer to use.
-- `add_momentum`: Minimize angle differences between successive pieces of a root?
 - `time_limit`: Time limit of the solver in seconds.
-- `hotstart_time`: Time limit of hotstart in seconds. Setting to 0 will disable hotstarting.
 - `num_roots`: The amount of root systems present in the graph.
 # Solver parameters
 - `ρₐ`: The probability of a root appearing without division from the main root.
@@ -24,7 +22,7 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
 function solve_rsa(
-        sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        sg::SuperGraph; optimizer, time_limit = missing,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = exp(1),
         α_down = -pi / 2, ϵ = 1e-3
     )
@@ -48,7 +46,7 @@ function solve_rsa(
     n_v = length(V₀(sg))
     n_e = length(E(sg))
     n_he = length(Eₕ₀(sg))
-    add_momentum && (n_c = length(connections))
+    n_c = length(connections)
 
     @variable(model, va[1:n_v], Bin) # is vertex active (part of the root)
     @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
@@ -58,7 +56,7 @@ function solve_rsa(
     @variable(model, e₊[1:n_e], Bin) # is this a positive edge (should it follow the natural polarity of the edge)
     # note: the natural polarity of an edge is defined as going from the vertex with the lowest id to the one with the highest id
 
-    add_momentum && @variable(model, f[1:n_c], Bin) # are these edges part of the same root
+    @variable(model, f[1:n_c], Bin) # are these edges part of the same root
 
     @variable(model, he[1:n_he], Bin) # is this hyperedge active
     NN_pred && @variable(model, heₚ[1:n_he], Bin) # is this a primary hyperedge
@@ -71,7 +69,7 @@ function solve_rsa(
     ep2f = Dict([E(sg)[i] => ep[i] for i in eachindex(E(sg))])
     e₊2f = Dict([E(sg)[i] => e₊[i] for i in eachindex(E(sg))])
 
-    add_momentum && (c2f = Dict([connections[i] => f[i] for i in eachindex(connections)]))
+    c2f = Dict([connections[i] => f[i] for i in eachindex(connections)])
 
     hea2f = Dict([Eₕ₀(sg)[i] => he[i] for i in eachindex(Eₕ₀(sg))])
     NN_pred && (hep2f = Dict(Eₕ₀(sg)[i] => heₚ[i] for i in eachindex(Eₕ₀(sg))))
@@ -90,12 +88,10 @@ function solve_rsa(
             hea2f[he] * log(ρₕ / (1 - ρₕ))
                 for he in Eₕ₀(sg)
         ) +
-            # similar angles
-            (
-            !add_momentum ? 0 : sum(
-                    c2f[c] * log(ρₘ(sg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, c; ρₘ_max, ϵ)))
-                    for v in V₀(sg) for c in E₂(v) if !any([is_augmented(e) for e in c])
-                )
+        # similar angles
+        sum(
+            c2f[c] * log(ρₘ(sg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, c; ρₘ_max, ϵ)))
+            for v in V₀(sg) for c in E₂(v) if !any([is_augmented(e) for e in c])
         ) +
             # gravitropy (needs to be split up into two sums to remain a linear objective)
             sum(
@@ -135,15 +131,13 @@ function solve_rsa(
         # It has an incoming and an outgoing edge
         @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e])) * polarity(e, v) for e in E(v)) == 0)
 
-        if add_momentum
-            # It is active ⇔ It has one active connection
-            @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
-            
-            # For all its edges:
-            for e in E(v)
-                # It is active ⇔ One connection containing this vertex and edge is active
-                @constraint(model, ea2f[e] == sum(c2f[c] for c in E₂(v, e)))
-            end
+        # It is active ⇔ It has one active connection
+        @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
+        
+        # For all its edges:
+        for e in E(v)
+            # It is active ⇔ One connection containing this vertex and edge is active
+            @constraint(model, ea2f[e] == sum(c2f[c] for c in E₂(v, e)))
         end
     end
 
@@ -195,37 +189,12 @@ function solve_rsa(
         @constraint(model, sum(ep2f[e] for e in E(vₑ)) == num_roots)
     end
 
-    # A standard vertex may not have two active edges to the same hypervertex (not required if momentum is added)
-    add_momentum || for v in V₀(sg), he in Eₕ₀(v)
-        es = filter(e -> id(v) in vertices(e), E(sg, he))
-        @constraint(model, sum(ea2f[e] for e in es) <= 1)
-    end
-
     # symmetry breaking
     for hv in Vₕ₀(sg)
         svs = V(sg, hv)
         for i in 2:length(svs)
             @constraint(model, va2f[svs[i]] <= va2f[svs[i-1]])
             @constraint(model, vp2f[svs[i]] <= vp2f[svs[i-1]])
-        end
-    end
-
-    # # Hotstart
-
-    if (hotstart_time > 0) && add_momentum
-        @info "Running hotstart"
-        start_model = solve_rsa(sg; optimizer, add_momentum = false, time_limit = hotstart_time,
-            num_roots, ρₐ, ρₕ, ρₘ_max, ρₙₙ_max, ρᵧ_max, ρₒ_base, α_down, ϵ)
-
-        vars = all_variables(start_model)
-        sols = value.(vars)
-        for (start_var, start_sol) in zip(vars, sols)
-            varname = JuMP.name(start_var)
-            isempty(varname) && continue
-            var_current = variable_by_name(model, varname)
-            if var_current !== nothing
-                set_start_value(var_current, start_sol)
-            end
         end
     end
 
