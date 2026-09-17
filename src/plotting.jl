@@ -121,7 +121,7 @@ function add_annotation!(ax::Makie.Axis, sg::SuperGraph, hes::Vector{<:HyperEdge
     return nothing
 end
 
-function annotation_plot(sg::SuperGraph; size = (600, 400), fontsize = 6, edge_kwargs::Dict = Dict(), kwargs...)
+function annotation_plot(sg::SuperGraph; size = (600, 400), fontsize = 4, edge_kwargs::Dict = Dict(), kwargs...)
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
 
@@ -158,7 +158,7 @@ function rootplot(rs::Vector{<:Root}; size = (600, 400), line_kwargs::Dict = Dic
 end
 
 # ### Multiple (entangled) root systems
-function rootplot!(ax::Makie.Axis, rss::Vector{<:Vector{<:Root}}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+function rootplot!(ax::Makie.Axis, rss::Vector{<:Vector{<:Root}}; line_kwargs::Dict = Dict(), kwargs...)
     for rs in rss
         rootplot!(ax, rs; line_kwargs...)
     end
@@ -168,6 +168,21 @@ function rootplot(rss::Vector{<:Vector{<:Root}}; size = (600, 400), line_kwargs:
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
     rootplot!(ax, rss; line_kwargs...)
+
+    return f
+end
+
+# ### A whole plate o' root systems
+function rootplot!(ax::Makie.Axis, root_systems::Vector{<:Vector{<:Vector{<:Root}}}; line_kwargs::Dict = Dict(), kwargs...)
+    for rss in root_systems
+        rootplot!(ax, rss; line_kwargs...)
+    end
+end
+
+function rootplot(root_systems::Vector{<:Vector{<:Vector{<:Root}}}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+    f = Figure(; size)
+    ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
+    rootplot!(ax, root_systems; line_kwargs...)
 
     return f
 end
