@@ -14,7 +14,7 @@ difficulty = "baby"
 validation_dir = "validation/$(difficulty)"
 
 directory = playground_dir
-roi_nr = 3
+roi_nr = 6
 
 # read data
 
@@ -32,7 +32,7 @@ begin
 end
 
 begin
-    min_vertices = 20
+    min_vertices = 10
     y_threshold = -1000
 
     rgs = get_subgraphs(rg_full) |>
@@ -72,10 +72,10 @@ graphplot(rg)
 begin
     model, time = @timed solve_rsa(
         rg; optimizer = HiGHS.Optimizer, time_limit = 60,
-        num_roots = 1
+        num_roots = 1, ρₘ_max = 0.5
     )
 
-    annotate_that_thang = true
+    annotate_that_thang = false
     if annotate_that_thang
         f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1000, 2000))
         rd = get_result_dict(rg, model)
@@ -181,7 +181,7 @@ T, U = typeof(rg).parameters
 
 result_dict = get_result_dict(rg, model)
 
-# get all primary root(s)
+# get all primary root fragments
 primaries = Root{T, U}[]
 
 c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp])))

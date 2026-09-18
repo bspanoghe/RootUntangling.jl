@@ -1,4 +1,15 @@
 # # Type
+struct RootFragment{T, U}
+    is_primary::Bool
+    edges::Vector{RootEdge{T, U}}
+    start::RootVertex{T, U}
+    stop::RootVertex{T, U}
+end
+is_primary(rf::RootFragment) = rf.is_primary
+edges(rf::RootFragment) = rf.edges
+start(rf::RootFragment) = rf.start
+stop(rf::RootFragment) = rf.stop
+
 """
     Root
 
