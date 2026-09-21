@@ -10,11 +10,11 @@ ENV["JULIA_DEBUG"] = RootUntangling
 # choose boy
 
 playground_dir = "playground"
-difficulty = "baby"
+difficulty = "tough"
 validation_dir = "validation/$(difficulty)"
 
 directory = playground_dir
-roi_nr = 6
+roi_nr = 4
 
 # read data
 
@@ -207,30 +207,36 @@ end
 
 import RootUntangling: RootEdge
 
-function grow_root!(c_counts::Dict, e₊_counts::Dict, e₋_counts::Dict, rg::RootGraph, root_type::Symbol)
+function get_possible_directions(c::Vector{<:RootEdge}, e₊_counts::Dict, e₋_counts::Dict)
+    opposite_direction = allequal(src.(c)) || allequal(dst.(c)) # both edges point towards or away from shared vertex
+    return Dict(
+        [true, true] => !opposite_direction && e₊_counts[c[1]] > 0 && e₊_counts[c[2]] > 0,
+        [false, false] => !opposite_direction && e₋_counts[c[1]] > 0 && e₋_counts[c[2]] > 0,
+        [true, false] => opposite_direction && e₊_counts[c[1]] > 0 && e₋_counts[c[2]] > 0,
+        [false, true] => opposite_direction && e₋_counts[c[1]] > 0 && e₊_counts[c[2]] > 0,
+    )
+end
+
+function grow_rootfragment!(c_counts::Dict, e₊_counts::Dict, e₋_counts::Dict, rg::RootGraph, root_type::Symbol)
     root_type ∈ [:primary, :lateral] || error("Root type should be primary or lateral")
     
     # start with a random active connection
     c0 = findfirst(x -> x > 0, c_counts)
     c_counts[c0] -= 1
 
-    # determine what directions are possible for the two edges
-    es = c0
-    follows_polarity = Bool[]
-    opposite_direction = allequal(src.(es)) || allequal(dst.(es)) # both edges point towards or away from shared vertex
-    if opposite_direction # edges require different polarity
-        if e₊_counts[es[1]] > 0 && e₋_counts[es[2]] > 0
-            append!(follows_polarity, [true, false])
-        else
-            append!(follows_polarity, [false, true])
-        end
-    else # edges require same polarity
-        if e₊_counts[es[1]] > 0 && e₊_counts[es[2]] > 0
-            append!(follows_polarity, [true, true])
-        else
-            append!(follows_polarity, [false, false])
-        end
-    end
+    # choose directions of edges
+    directions = findfirst(get_possible_directions(c0, e₊_counts, e₋_counts))
+    isnothing(directions) && error("Oh what the heck")
+    RootFragment(
+        root_type == :primary,
+        c0,
+        vertices(c0[1])[findfirst(v -> !in(v, vertices(c0[2])), vertices(c0[1]))],
+        vertices(c0[2])[findfirst(v -> !in(v, vertices(c0[1])), vertices(c0[2]))],
+        directions...
+    )
+    
+    # instantiate root fragment
+
     
     has_restarted = false
     fullgrown = false

@@ -1,14 +1,20 @@
 # # Type
-struct RootFragment{T, U}
+mutable struct RootFragment{T, U}
     is_primary::Bool
     edges::Vector{RootEdge{T, U}}
-    start::RootVertex{T, U}
-    stop::RootVertex{T, U}
+    tip_start::T
+    tip_end::T
+    positive_start::Bool
+    positive_end::Bool
 end
 is_primary(rf::RootFragment) = rf.is_primary
 edges(rf::RootFragment) = rf.edges
-start(rf::RootFragment) = rf.start
-stop(rf::RootFragment) = rf.stop
+tip_start(rf::RootFragment) = rf.tip_start
+tip_end(rf::RootFragment) = rf.tip_end
+positive_start(rf::RootFragment) = rf.positive_start
+positive_end(rf::RootFragment) = rf.positive_end
+
+tips(rf::RootFragment) = [tip_start(rf), tip_end(rf)]
 
 """
     Root

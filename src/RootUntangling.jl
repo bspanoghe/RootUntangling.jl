@@ -3,7 +3,7 @@ module RootUntangling
 export RootGraph, get_rootgraph # data to graph
 export get_subgraphs # separate graphs
 export solve_rsa # solving
-export Root, get_rootsystems, get_root_systems, examine, curve_length # get and examine roots
+export RootFragment, Root, get_rootsystems, get_root_systems, examine, curve_length # get and examine roots
 export greedy_switch, roughness # postprocess roots
 export graphplot, rootplot, annotation_plot # plotting
 export get_annotation_dict, write_annotation # write output
