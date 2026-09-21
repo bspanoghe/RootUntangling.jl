@@ -42,7 +42,7 @@ end
 
 # does a root use one of the edges of a segment
 are_overlapping(sg::SuperGraph, he::HyperEdge, r::Root) = (
-    !all([isdisjoint(vs, vertices(r)) for vs in vertices(Vₕ(sg, he))])
+    !any([isdisjoint(vertices(hv), vertices(r)) for hv in Vₕ(sg, he)]) #! check if correct
 )
 
 # find hyperedges where multiple lateral roots overlap (and can switch)
