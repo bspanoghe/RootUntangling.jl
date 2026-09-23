@@ -48,7 +48,8 @@ function solve_rsa(
     n_c = length(connections)
 
     #! upper bounds
-    @variable(model, ea[1:n_e], Bin) # is edge active
+    @variable(model, ea[1:n_e], Bin) # does edge contain roots
+    @variable(model, epa[1:n_e], Bin) # does edge contain primary roots
     @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of primary roots in edge
     @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
     @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of lateral roots in edge
@@ -59,6 +60,7 @@ function solve_rsa(
 
     # connect model variables to graph's edges
     ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
+    epa2f = Dict([E(rg)[i] => epa[i] for i in eachindex(E(rg))])
     ep2f = Dict([E(rg)[i] => ep[i] for i in eachindex(E(rg))])
     ep₊2f = Dict([E(rg)[i] => ep₊[i] for i in eachindex(E(rg))])
     el2f = Dict([E(rg)[i] => el[i] for i in eachindex(E(rg))])
@@ -82,17 +84,26 @@ function solve_rsa(
             for e in E₀(rg)
         ) + 
         # but not TOO many #!
-        -0.4 * sum(
+        -0.5 * sum(
             (ep2f[e] + el2f[e]) * log(ρₕ / (1 - ρₕ)) #!
             for e in E₀(rg)
         ) +
-        # gravitropy (needs to be split up into two sums to remain a linear objective)
+        # primary gravitropy (needs to be split up into two sums to remain a linear objective)
         sum(
-            (ep₊2f[e] + el₊2f[e]) * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            ep₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
         sum(
-            ((ep2f[e] + el2f[e]) - (ep₊2f[e] + el₊2f[e])) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            (ep2f[e] - ep₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
+        ) + 
+        # lateral gravitropy (needs to be split up into two sums to remain a linear objective)
+        sum(
+            el₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
+        ) +
+        sum(
+            (el2f[e] - el₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # angle differences
@@ -107,7 +118,7 @@ function solve_rsa(
         set_objective_function(
             model,
             objective_function(model) + sum(
-                ep2f[e] * log(ρₙₙ(e; ρₙₙ_max, ϵ) / (1 - ρₙₙ(e; ρₙₙ_max, ϵ))) #! stacks w num of primary roots
+                epa2f[e] * log(ρₙₙ(e; ρₙₙ_max, ϵ) / (1 - ρₙₙ(e; ρₙₙ_max, ϵ)))
                 for e in E₀(rg)
             )
         )
@@ -134,6 +145,7 @@ function solve_rsa(
     for e in E(rg)
         # It can only be classified as active if it contains roots
         @constraint(model, ea2f[e] <= (ep2f[e] + el2f[e]))
+        @constraint(model, epa2f[e] <= ep2f[e])
 
         # The amount of roots in positive direction is no larger than the amount of total roots
         @constraint(model, ep₊2f[e] <= ep2f[e])
