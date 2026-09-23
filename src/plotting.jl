@@ -145,7 +145,7 @@ function rootplot!(ax::Makie.Axis, rs::Vector{<:Root}; kwargs...)
     for (i, r) in enumerate(rs)
         linestyle = is_primary(r) ? :solid : :dot
         color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs)+1)[i], 1, 0.75)
-        lines!(ax, r; linestyle, color, label = "$i", linewidth = 2, kwargs...)
+        lines!(ax, r; linestyle, color, label = "$i", linewidth = 3, kwargs...)
     end
 end
 
