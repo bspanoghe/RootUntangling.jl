@@ -1,5 +1,5 @@
 function greedy_switch(sg::SuperGraph, model::JuMP.Model, roots::Vector{<:Root};
-        max_tries = 100, f_obj::Function = roughness
+        max_tries = 100, f_obj::Function = weighted_tortuosity
     )
     if isempty(find_overlaps(sg, model, roots))
         @info "No overlaps found"
