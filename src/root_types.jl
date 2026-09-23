@@ -43,6 +43,8 @@ distance(r::Root) = sqrt((ys(r)[end] - ys(r)[1])^2 + (xs(r)[end] - xs(r)[1])^2)
 distance(v::SingularVertex, r::Root) = minimum(sqrt.((x(v) .- xs(r)) .^ 2 + (y(v) .- ys(r)) .^ 2))
 tortuosity(r::Root) = curve_length(r) / distance(r)
 tortuosity(rs::Vector{<:Root}) = sum(tortuosity.(rs))
+weighted_tortuosity(r::Root) = curve_length(r) * tortuosity(r)
+weighted_tortuosity(rs::Vector{<:Root}) = sum(weighted_tortuosity.(rs))
 function roughness(r::Root)
     angles = [angle(V(r)[i], V(r)[i-1]) for i in 2:length(r)]
     length(angles) == 1 && (return 0.0)
