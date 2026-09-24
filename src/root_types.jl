@@ -1,20 +1,36 @@
-# # Type
-mutable struct RootFragment{T, U}
-    is_primary::Bool
-    edges::Vector{RootEdge{T, U}}
-    tip_start::T
-    tip_end::T
-    positive_start::Bool
-    positive_end::Bool
+# # Types
+"""
+    RootArc{T}
+
+It's like a [`RootEdge`](@ref), but directed!
+"""
+struct RootArc{T} <: AbstractEdge
+    src::T
+    dst::T
+    segment_id::T
 end
+RootArc(re::RootEdge; keep_order::Bool) = (
+    keep_order ? RootArc(src(re), dst(re), segment_id(re)) : 
+        RootArc(dst(re), src(re), segment_id(re))
+)
+segment_id(ra::RootArc) = ra.segment_id
+
+
+
+
+abstract type RootFragment end
 is_primary(rf::RootFragment) = rf.is_primary
 edges(rf::RootFragment) = rf.edges
-tip_start(rf::RootFragment) = rf.tip_start
-tip_end(rf::RootFragment) = rf.tip_end
-positive_start(rf::RootFragment) = rf.positive_start
-positive_end(rf::RootFragment) = rf.positive_end
 
-tips(rf::RootFragment) = [tip_start(rf), tip_end(rf)]
+mutable struct DirectedRootFragment{T} <: RootFragment
+    is_primary::Bool
+    edges::Vector{RootArc{T}}
+end
+
+mutable struct UndirectedRootFragment{T, U} <: RootFragment
+    is_primary::Bool
+    edges::Vector{RootEdge{T, U}}
+end
 
 """
     Root

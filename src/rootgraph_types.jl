@@ -2,12 +2,23 @@
 is_augmented(v::Integer) = v < 0
 
 # # edges
+abstract type AbstractEdge end
+src(ae::AbstractEdge) = ae.src
+dst(ae::AbstractEdge) = ae.dst
+vertices(ae::AbstractEdge) = (src(ae), dst(ae))
+is_augmented(ae::AbstractEdge) = any(is_augmented.(vertices(ae)))
+
+Base.sort(aes::Vector{<:AbstractEdge}) = sort(aes, by = vertices)
+Base.:(==)(ae1::RootEdge, ae2::RootEdge) = vertices(ae1) == vertices(ae2)
+Base.unique(aes::Vector{<:AbstractEdge}) = unique(x -> vertices(x), aes) # doesn't automatically use my equality operator :(
+Base.unique!(aes::Vector{<:AbstractEdge}) = unique!(x -> vertices(x), aes) # sad times
+
 """
     RootEdge{T, U}
 
 Represents a segment from a root scan, which may contain roots going in either direction.
 """
-struct RootEdge{T, U}
+struct RootEdge{T, U} <: AbstractEdge
     src::T
     dst::T
     segment_id::T
@@ -21,19 +32,10 @@ end
 RootEdge(src::T, dst::T) where {T} = RootEdge(src, dst, 0, NaN, NaN)
 RootEdge(s::Segment) = RootEdge(vertices(s)..., id(s), width(s), pred_primary(s))
 
-src(re::RootEdge) = re.src
-dst(re::RootEdge) = re.dst
 segment_id(re::RootEdge) = re.segment_id
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
-vertices(re::RootEdge) = (src(re), dst(re))
 
-is_augmented(re::RootEdge) = any(is_augmented.(vertices(re)))
-
-Base.sort(res::Vector{<:RootEdge}) = sort(res, by = vertices)
-Base.:(==)(re1::RootEdge, re2::RootEdge) = vertices(re1) == vertices(re2)
-Base.unique(res::Vector{<:RootEdge}) = unique(x -> vertices(x), res) # doesn't automatically use my equality operator :(
-Base.unique!(res::Vector{<:RootEdge}) = unique!(x -> vertices(x), res) # sad times
 Base.show(io::IO, re::RootEdge) = print(io, "$(typeof(re).name.name)$(vertices(re))")
 Base.show(io::IO, res::Vector{<:RootEdge}) = print(io, "$(typeof(res).name.name)$(vertices.(res))")
 
