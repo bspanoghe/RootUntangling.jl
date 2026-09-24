@@ -13,8 +13,8 @@ playground_dir = "playground"
 difficulty = "tough"
 validation_dir = "validation/$(difficulty)"
 
-directory = playground_dir
-roi_nr = 4
+directory = validation_dir
+roi_nr = 1
 
 # read data
 
@@ -71,11 +71,11 @@ graphplot(rg)
 
 begin
     model, time = @timed solve_rsa(
-        rg; optimizer = HiGHS.Optimizer, time_limit = 60,
-        num_roots = 1, ρₘ_max = 0.5
+        rg; optimizer = Gurobi.Optimizer, time_limit = 60,
+        num_roots = 1
     )
 
-    annotate_that_thang = false
+    annotate_that_thang = true
     if annotate_that_thang
         f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1000, 2000))
         rd = get_result_dict(rg, model)
@@ -95,6 +95,7 @@ begin
 
     f_g
 end
+
 save(homedir() * "/Downloads/wwawa.svg", f_g)
 
 roots = get_rootsystems(rg, model);
@@ -182,16 +183,27 @@ T, U = typeof(rg).parameters
 result_dict = get_result_dict(rg, model)
 
 # get all primary root fragments
-primaries = Root{T, U}[]
 
 c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp])))
+e_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep])))
 e₊_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep₊])))
 e₋_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep]) - value.(model[:ep₊])))
-# filter!(x -> x.second > 0, c_counts) #!
 
-while !isempty(c_counts)
-    root = grow_root!(c_counts, :primary)
-end
+primary_fragments = fragment(rg, true, c_counts, e_counts, e₊_counts, e₋_counts)
+unambiguous_stitch_fragments!(primary_fragments)
+
+c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl])))
+e_counts = Dict(E(rg) .=> round.(Int64, value.(model[:el])))
+e₊_counts = Dict(E(rg) .=> round.(Int64, value.(model[:el₊])))
+e₋_counts = Dict(E(rg) .=> round.(Int64, value.(model[:el]) - value.(model[:el₊])))
+
+lateral_fragments = fragment(rg, true, c_counts, e_counts, e₊_counts, e₋_counts)
+unambiguous_stitch_fragments!(lateral_fragments)
+
+
+
+
+
 
 # assign laterals that split to their primary root
 
@@ -202,10 +214,143 @@ end
 
 # get primary root(s)
 
+import RootUntangling: RootEdge, RootFragment, DirectedRootFragment, UndirectedRootFragment, edge_vertices
+
+function fragment(rg::RootGraph{T, U}, is_primary::Bool,
+        c_counts::Dict, e_counts::Dict, e₊_counts::Dict, e₋_counts::Dict
+    )
+
+    fragments = RootFragment[]
+
+    for c in E₂(rg)
+        v_shared = shared_vertex(c)
+
+        if c_counts[c] == e_counts[c[1]] # first edge fully explains connection
+
+            e = c[1]
+            for i in 1:e₊_counts[e] # root follows direction of edge
+                if dst(e) == v_shared # does edge go toward shared vertex?
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+                else
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+                end                    
+            end
+
+            for i in 1:e₋_counts[e] # root goes against direction of edge
+                if dst(e) != v_shared # flip direction
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+                else
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+                end        
+            end
+
+        elseif c_counts[c] == e_counts[c[2]] # second edge fully explains connection
+
+            e = c[2]
+            for i in 1:e₊_counts[e] # root follows direction of edge
+                if src(e) == v_shared # does edge go away from shared vertex?
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+                else
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+                end
+            end
+
+            for i in 1:e₋_counts[e] # root goes against direction of edge
+                if src(e) != v_shared # flip direction
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+                else
+                    add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+                end
+            end
+
+        else # neither edge fully explains connection
+
+            for i in 1:c_counts[c]
+                push!(fragments, UndirectedRootFragment(is_primary, c))
+            end
+
+        end
+    end
+
+    return fragments
+end
+
+shared_vertex(c::Vector{<:RootEdge}) = vertices(c[1])[findfirst(v -> in(v, vertices(c[2])), vertices(c[1]))]
+function add_directed_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool, c::Vector{<:RootEdge}, v_shared; switch_edges::Bool)
+    if !switch_edges
+        push!(fragments, DirectedRootFragment(
+            is_primary, 
+            [
+                RootArc(c[1], keep_order = (dst(c[1]) == v_shared)),
+                RootArc(c[2], keep_order = (src(c[2]) == v_shared))
+            ])
+        )
+    else
+        push!(fragments, DirectedRootFragment(is_primary,
+            [
+                RootArc(c[2], keep_order = (dst(c[2]) == v_shared)),
+                RootArc(c[1], keep_order = (src(c[1]) == v_shared))
+            ])
+        )
+    end
+
+    return nothing
+end
 
 
 
-import RootUntangling: RootEdge
+function unambiguous_stitch_fragments!(fragments::Vector{<:RootFragment})
+
+    growing = true
+    # keep going until all root fragments cant grow anymore
+    while growing
+        growing = false
+        for (i, fragment) in enumerate(fragments)
+            
+            f_end_idxs = findall(f -> connects_to_end(fragment, f), fragments)
+            if are_options_unambiguous(fragments[f_end_idxs])
+                stitch_to_end!(fragment, fragments[f_end_idxs[1]])
+                deleteat!(fragments, f_end_idxs[1])
+                
+                growing = true
+            end
+
+            f_start_idxs = findall(f -> connects_to_start(fragment, f), fragments)
+            if are_options_unambiguous(fragments[f_start_idxs])
+                stitch_to_start!(fragment, fragments[f_start_idxs[1]]) # connect one of them
+                deleteat!(fragments, f_start_idxs[1])
+
+                growing = true
+            end
+
+        end
+    end
+
+    return nothing
+end
+
+are_options_unambiguous(xs) = (
+    (length(xs) == 1) || # there is only one option
+        (length(xs) > 1 && allequal(xs)) # all options are equal
+)
+
+connects_to_end(f1::DirectedRootFragment, f2::DirectedRootFragment) = edge_vertices(f1)[end] == edge_vertices(f2)[1]
+connects_to_start(f1::DirectedRootFragment, f2::DirectedRootFragment) = edge_vertices(f1)[1] == edge_vertices(f2)[end]
+
+stitch_to_end!(f1::DirectedRootFragment, f2::DirectedRootFragment) = append!(f1.edge_vertices, f2.edge_vertices[2:end])
+stitch_to_start!(f1::DirectedRootFragment, f2::DirectedRootFragment) = prepend!(f1.edge_vertices, f2.edge_vertices[1:end-1])
+
+# https://www.youtube.com/watch?v=TVI7S6zKiBM
+function ambiguous_stitch_fragments!(fragments::Vector{<:RootFragment})
+
+end
+
+
+
+
+
+
+
 
 function get_possible_directions(c::Vector{<:RootEdge}, e₊_counts::Dict, e₋_counts::Dict)
     opposite_direction = allequal(src.(c)) || allequal(dst.(c)) # both edges point towards or away from shared vertex
@@ -220,10 +365,6 @@ end
 function grow_rootfragment!(c_counts::Dict, e₊_counts::Dict, e₋_counts::Dict, rg::RootGraph, root_type::Symbol)
     root_type ∈ [:primary, :lateral] || error("Root type should be primary or lateral")
     
-    # start with a random active connection
-    c0 = findfirst(x -> x > 0, c_counts)
-    c_counts[c0] -= 1
-
     # choose directions of edges
     directions = findfirst(get_possible_directions(c0, e₊_counts, e₋_counts))
     isnothing(directions) && error("Oh what the heck")
