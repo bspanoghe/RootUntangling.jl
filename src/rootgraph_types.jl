@@ -9,9 +9,11 @@ vertices(ae::AbstractEdge) = (src(ae), dst(ae))
 is_augmented(ae::AbstractEdge) = any(is_augmented.(vertices(ae)))
 
 Base.sort(aes::Vector{<:AbstractEdge}) = sort(aes, by = vertices)
-Base.:(==)(ae1::RootEdge, ae2::RootEdge) = vertices(ae1) == vertices(ae2)
+Base.:(==)(ae1::AbstractEdge, ae2::AbstractEdge) = vertices(ae1) == vertices(ae2)
 Base.unique(aes::Vector{<:AbstractEdge}) = unique(x -> vertices(x), aes) # doesn't automatically use my equality operator :(
 Base.unique!(aes::Vector{<:AbstractEdge}) = unique!(x -> vertices(x), aes) # sad times
+Base.show(io::IO, ae::AbstractEdge) = print(io, "$(typeof(ae).name.name)$(vertices(ae))")
+Base.show(io::IO, aes::Vector{<:AbstractEdge}) = print(io, "$(typeof(aes).name.name)$(vertices.(aes))")
 
 """
     RootEdge{T, U}
@@ -36,8 +38,17 @@ segment_id(re::RootEdge) = re.segment_id
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
 
-Base.show(io::IO, re::RootEdge) = print(io, "$(typeof(re).name.name)$(vertices(re))")
-Base.show(io::IO, res::Vector{<:RootEdge}) = print(io, "$(typeof(res).name.name)$(vertices.(res))")
+# Like a RootEdge, but directed! (Used in root construction)
+struct RootArc{T} <: AbstractEdge
+    src::T
+    dst::T
+    segment_id::T
+end
+RootArc(re::RootEdge; keep_order::Bool) = (
+    keep_order ? RootArc(src(re), dst(re), segment_id(re)) : 
+        RootArc(dst(re), src(re), segment_id(re))
+)
+segment_id(ra::RootArc) = ra.segment_id
 
 # vertices
 """
@@ -131,8 +142,8 @@ E₂(rg::RootGraph, re::RootEdge) = [
 
 
 # additional methods using mathematical syntax of V / V₀ and E / E₀
-V(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = [getrootvertex(rg, v) for v in vertices(re)]
-V(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = [getrootvertex(rg, v) for v in vertices(rv)]
+V(rg::RootGraph{T, U}, ae::AbstractEdge) where {T, U} = [getrootvertex(rg, v) for v in vertices(ae)]
+V(rg::RootGraph{T, U}, v::T) where {T, U} = getrootvertex(rg, v)
 
 E(rv::RootVertex) = edges(rv)
 E(rvs::Vector{<:RootVertex}) = reduce(vcat, E.(rvs), init = eltype(rvs)[])

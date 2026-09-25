@@ -97,36 +97,38 @@ end
 
 # # Root plotting
 # ## Type recipe for single roots
-Makie.convert_arguments(::Type{<:Lines}, r::Root) = (xs(r), ys(r))
+Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, r::Root) = (xs(rg, r), ys(rg, r))
 
 # ## Root systems
-function rootplot!(ax::Makie.Axis, rs::Vector{<:Root}; kwargs...)
-    for (i, r) in enumerate(rs)
-        linestyle = is_primary(r) ? :solid : :dot
-        color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs)+1)[i], 1, 0.75)
-        lines!(ax, r; linestyle, color, label = "$i", linewidth = 2, kwargs...)
+function rootplot!(ax::Makie.Axis, rg::RootGraph, rs::RootSystem; kwargs...)
+    r = primary(rs)
+    lines!(ax, rg, r; color = HSV(0, 1, 0), linestyle = :solid, label = "0", linewidth = 2, kwargs...)
+
+    for (i, r) in enumerate(laterals(rs))
+        color = HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
+        lines!(ax, rg, r; color, linestyle = :dot, label = "$i", linewidth = 2, kwargs...)
     end
 end
 
-function rootplot(rs::Vector{<:Root}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+function rootplot(rg::RootGraph, rs::RootSystem; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-    rootplot!(ax, rs; line_kwargs...)
+    rootplot!(ax, rg, rs; line_kwargs...)
 
     return f
 end
 
 # ### Multiple (entangled) root systems
-function rootplot!(ax::Makie.Axis, rss::Vector{<:Vector{<:Root}}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+function rootplot!(ax::Makie.Axis, rg::RootGraph, rss::Vector{<:RootSystem}; line_kwargs::Dict = Dict(), kwargs...)
     for rs in rss
-        rootplot!(ax, rs; line_kwargs...)
+        rootplot!(ax, rg, rs; line_kwargs...)
     end
 end
 
-function rootplot(rss::Vector{<:Vector{<:Root}}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+function rootplot(rg::RootGraph, rss::Vector{<:RootSystem}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-    rootplot!(ax, rss; line_kwargs...)
+    rootplot!(ax, rg, rss; line_kwargs...)
 
     return f
 end

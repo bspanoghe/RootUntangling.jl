@@ -84,7 +84,7 @@ function solve_rsa(
             for e in E₀(rg)
         ) + 
         # but not TOO many #!
-        -0.5 * sum(
+        -0.75 * sum(
             (ep2f[e] + el2f[e]) * log(ρₕ / (1 - ρₕ)) #!
             for e in E₀(rg)
         ) +
