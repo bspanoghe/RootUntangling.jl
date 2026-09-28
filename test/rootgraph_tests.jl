@@ -45,7 +45,7 @@ rv = only(V₊(rg));
 
 # # edges
 # correct direction
-rv = V₀(rg)[1]
+rv = V₀(rg)[1];
 
 e = edges(rv)[findfirst(is_augmented, edges(rv))]
 @test direction(rv, e) == -1
@@ -53,13 +53,13 @@ e = edges(rv)[findfirst(is_augmented, edges(rv))]
 e = edges(rv)[findfirst(e -> e isa RootEdge && !is_augmented(e), edges(rv))]
 @test direction(rv, e) == 1
 
-es = filter(e -> e isa RootEdge, edges(rv))
+es = filter(e -> e isa RootEdge, edges(rv));
 @test issetequal(
     [direction(rv, e) for e in es],
     [1, -1]
 )
 
-rv = V₊(rg)[1]
+rv = V₊(rg)[1];
 @test all([direction(rv, e) == 1 for e in edges(rv)])
 
 # are edges sorted
