@@ -20,6 +20,7 @@ outer_vertices(rg::RootGraph) = [v for v in V₀(rg) if length([n for n in neigh
 # direction
 direction(rv::RootVertex{T, U}, re::RootEdge{T}) where {T, U} = src(re) == id(rv) ? 1 : -1
 direction(rv1::RootVertex{T, U}, rv2::RootVertex{T, U}) where {T, U} = id(rv1) < id(rv2) ? 1 : -1
+direction(c::Vector{RootEdge{T, U}}, e::RootEdge{T, U}) where {T, U} = e == c[2] ? 1 : -1
 
 # angles
 angle(rv1::RootVertex{T, U}, rv2::RootVertex{T, U}; reverse_order::Bool = false) where {T, U} = (

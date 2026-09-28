@@ -23,9 +23,9 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
 function solve_rsa(
-        rg::RootGraph; optimizer, time_limit = missing,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = exp(1),
-        α_down = -pi / 2, ϵ = 1e-3
+        rg::RootGraph; optimizer, time_limit = missing, max_roots = 3,
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₒ = 0.1, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5,
+        w_gp = 1.0, w_gl = 1.0, ρₒ_base = exp(1),  α_down = -pi / 2, ϵ = 1e-3
     )
 
     @assert ρₒ_base >= 1 "The base for the overlap probability must be greater or equal than 1."
@@ -47,16 +47,17 @@ function solve_rsa(
     n_e = length(E(rg))
     n_c = length(connections)
 
-    #! upper bounds
     @variable(model, ea[1:n_e], Bin) # does edge contain roots
     @variable(model, epa[1:n_e], Bin) # does edge contain primary roots
-    @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of primary roots in edge
-    @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
-    @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of lateral roots in edge
-    @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = 3) # number of roots in edge following positive direction
+    @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of primary roots in edge
+    @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of roots in edge following positive direction
+    @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of lateral roots in edge
+    @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of roots in edge following positive direction
 
-    @variable(model, cp[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in primary connection
-    @variable(model, cl[1:n_c], Int, lower_bound = 0, upper_bound = 3) # number of edges in lateral connection
+    @variable(model, cp[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in primary connection
+    @variable(model, cp₊[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in primary connection
+    @variable(model, cl[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in lateral connection
+    @variable(model, cl₊[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in lateral connection
 
     # connect model variables to graph's edges
     ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
@@ -67,7 +68,9 @@ function solve_rsa(
     el₊2f = Dict([E(rg)[i] => el₊[i] for i in eachindex(E(rg))])
 
     cp2f = Dict([connections[i] => cp[i] for i in eachindex(connections)])
+    cp₊2f = Dict([connections[i] => cp₊[i] for i in eachindex(connections)])
     cl2f = Dict([connections[i] => cl[i] for i in eachindex(connections)])
+    cl₊2f = Dict([connections[i] => cl₊[i] for i in eachindex(connections)])
 
     # define objective
     @objective(
@@ -83,26 +86,26 @@ function solve_rsa(
             ea2f[e] * log(ρₕ / (1 - ρₕ))
             for e in E₀(rg)
         ) + 
-        # but not TOO many #!
-        -0.75 * sum(
-            (ep2f[e] + el2f[e]) * log(ρₕ / (1 - ρₕ)) #!
+        # overlap probability
+        sum(
+            (ep2f[e] + el2f[e]) * log(ρₒ / (1 - ρₒ)) #! -1?
             for e in E₀(rg)
         ) +
         # primary gravitropy (needs to be split up into two sums to remain a linear objective)
-        sum(
+        w_gp * sum(
             ep₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
-        sum(
+        w_gp * sum(
             (ep2f[e] - ep₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # lateral gravitropy (needs to be split up into two sums to remain a linear objective)
-        sum(
+        w_gl * sum(
             el₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
-        sum(
+        w_gl * sum(
             (el2f[e] - el₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
@@ -130,15 +133,24 @@ function solve_rsa(
 
     # ### For a standard vertex:
     for v in V₀(rg)
-        # For all of its standard edges:
+        # For all of its edges:
         for e in E(v)
             # it contains as many roots as the sum of its connections
             @constraint(model, ep2f[e] == sum(cp2f[c] for c in E₂(v, e)))
             @constraint(model, el2f[e] == sum(cl2f[c] for c in E₂(v, e)))
+
+            # it has as many roots in a given direction as the sum of its connected roots in that direction
+            @constraint(
+                model, 
+                (ep₊2f[e] - (ep2f[e] - ep₊2f[e])) * direction(v, e) == 
+                    sum((cp₊2f[c] - (cp2f[c] - cp₊2f[c])) * direction(c, e) for c in E₂(v, e))
+            )
+            @constraint(
+                model,
+                (el₊2f[e] - (el2f[e] - el₊2f[e])) * direction(v, e) == 
+                    sum((cl₊2f[c] - (cl2f[c] - cl₊2f[c])) * direction(c, e) for c in E₂(v, e))
+            )
         end
-        # It has equal incoming and outgoing roots
-        @constraint(model, sum((ep₊2f[e] - (ep2f[e] - ep₊2f[e])) * direction(v, e) for e in E(v)) == 0)
-        @constraint(model, sum((el₊2f[e] - (el2f[e] - el₊2f[e])) * direction(v, e) for e in E(v)) == 0)
     end
 
     # ### For any edge:
@@ -150,6 +162,12 @@ function solve_rsa(
         # The amount of roots in positive direction is no larger than the amount of total roots
         @constraint(model, ep₊2f[e] <= ep2f[e])
         @constraint(model, el₊2f[e] <= el2f[e])
+    end
+
+    for c in E₂(rg)
+        # The amount of connections in positive directions is no larger than the amount of connections
+        @constraint(model, cp₊2f[c] <= cp2f[c])
+        @constraint(model, cl₊2f[c] <= cl2f[c])
     end
 
     # ## Special vertices
@@ -221,7 +239,3 @@ bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # NN pred primary probability
 ρₙₙ(re; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p; ϵ)
-
-# root overlap probability
-ρ₀(rv::RootVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(rv)) |> p -> bound(p; ϵ)
-order(rv::RootVertex) = id(rv) - vertices(rootvertex(rv))[1]
