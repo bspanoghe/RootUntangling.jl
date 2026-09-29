@@ -5,6 +5,7 @@ is_augmented(v::Integer) = v < 0
 abstract type AbstractEdge end
 src(ae::AbstractEdge) = ae.src
 dst(ae::AbstractEdge) = ae.dst
+segment_id(ae::AbstractEdge) = ae.segment_id
 vertices(ae::AbstractEdge) = (src(ae), dst(ae))
 is_augmented(ae::AbstractEdge) = any(is_augmented.(vertices(ae)))
 
@@ -37,18 +38,6 @@ RootEdge(s::Segment) = RootEdge(vertices(s)..., id(s), width(s), pred_primary(s)
 segment_id(re::RootEdge) = re.segment_id
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
-
-# Like a RootEdge, but directed! (Used in root construction)
-struct RootArc{T} <: AbstractEdge
-    src::T
-    dst::T
-    segment_id::T
-end
-RootArc(re::RootEdge; keep_order::Bool) = (
-    keep_order ? RootArc(src(re), dst(re), segment_id(re)) : 
-        RootArc(dst(re), src(re), segment_id(re))
-)
-segment_id(ra::RootArc) = ra.segment_id
 
 # vertices
 """

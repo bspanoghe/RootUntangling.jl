@@ -1,18 +1,40 @@
 # # Types
+struct DirectedRootEdge{T} <: AbstractEdge
+    src::T
+    dst::T
+    segment_id::T
+end
+DirectedRootEdge(ae::AbstractEdge; keep_order::Bool) = (
+    keep_order ? DirectedRootEdge(src(ae), dst(ae), segment_id(ae)) : 
+        DirectedRootEdge(dst(ae), src(ae), segment_id(ae))
+)
+
+struct UndirectedRootEdge{T} <: AbstractEdge
+    src::T
+    dst::T
+    segment_id::T
+end
+UndirectedRootEdge(re::RootEdge) = UndirectedRootEdge(src(re), dst(re), segment_id(re))
+
+Base.:(==)(dre::DirectedRootEdge, ure::UndirectedRootEdge) = issetequal(vertices(dre), vertices(ure))
+Base.:(==)(ure::UndirectedRootEdge, dre::DirectedRootEdge) = issetequal(vertices(dre), vertices(ure))
+
+
+
 abstract type RootFragment end
 is_primary(rf::RootFragment) = rf.is_primary
 edges(rf::RootFragment) = rf.edges
 is_fullgrown(rf::RootFragment) = all(is_augmented.(edges(rf)[[1, end]]))
 vertices(rf::RootFragment) = unique(Iterators.flatten(vertices.(edges(rf))))
 
-mutable struct DirectedRootFragment{T} <: RootFragment
+struct DirectedRootFragment{T} <: RootFragment
     is_primary::Bool
-    edges::Vector{RootArc{T}}
+    edges::Vector{DirectedRootEdge{T}}
 end
 
-mutable struct UndirectedRootFragment{T, U} <: RootFragment
+struct UndirectedRootFragment{T} <: RootFragment
     is_primary::Bool
-    edges::Vector{RootEdge{T, U}}
+    edges::Vector{UndirectedRootEdge{T}}
 end
 
 """
