@@ -1,87 +1,107 @@
-# # Type
+# # Types
+
+struct RootFragment{T}
+    is_primary::Bool
+    edges::Vector{RootArc{T}}
+end
+
+is_primary(rf::RootFragment) = rf.is_primary
+edges(rf::RootFragment) = rf.edges
+is_fullgrown(rf::RootFragment) = all(is_augmented.(edges(rf)[[1, end]]))
+vertices(rf::RootFragment) = unique(Iterators.flatten(vertices.(edges(rf))))
+
+
 """
     Root
 
 Represents a single root in a root system.
-
-Root systems, as acquired by [`get_roots`](@ref) are represented by an array of `Root`s.
-You can inspect these using the function [`examine`](@ref) or manually calculate the root lengths using [`curve_length`](@ref).
 """
-struct Root{T, U}
+abstract type Root end
+is_primary(::Root) = r.is_primary
+fragments(::Root) = error("What do you mean you didn't implement the method yet?!")
+edges(::Root) = error("What do you mean you didn't implement the method yet?!")
+is_fullgrown(::Root) =  error("What do you mean you didn't implement the method yet?!")
+vertices(::Root) =  error("What do you mean you didn't implement the method yet?!")
+Base.length(r::Root) = length(edges(r))
+
+V(rg::RootGraph, r::Root) = V.([rg], vertices(r))
+V₀(rg::RootGraph, r::Root) = V(rg, r)[2:(end-1)] # first and last vertex are always augmented
+xs(rg::RootGraph, r::Root) = x.(V₀(rg, r))
+ys(rg::RootGraph, r::Root) = y.(V₀(rg, r))
+distance(rg::RootGraph, r::Root) = sqrt((ys(rg, r)[end] - ys(rg, r)[1])^2 + (xs(rg, r)[end] - xs(rg, r)[1])^2)
+distance(rg::RootGraph, rv::RootVertex, r::Root) = (
+    minimum(sqrt.((x(rv) .- xs(rg, r)) .^ 2 + (y(rv) .- ys(rg, r)) .^ 2))
+)
+curve_length(rg::RootGraph, r::Root) = sqrt.(diff(xs(rg, r)) .^ 2 + diff(ys(rg, r)) .^ 2) |> sum
+tortuosity(rg::RootGraph, r::Root) = curve_length(rg, r) / distance(rg, r)
+tortuosity(rg::RootGraph, rs::Vector{<:Root}) = sum(tortuosity.([rg], rs))
+weighted_tortuosity(rg::RootGraph, r::Root) = curve_length(rg, r) * tortuosity(rg, r)
+weighted_tortuosity(rg::RootGraph, rs::Vector{<:Root}) = sum(weighted_tortuosity.([rg], rs))
+
+# root consisting of a single fragment
+struct SimpleRoot{T} <: Root
     is_primary::Bool
-    V::Vector{SingularVertex{T, U}}
+    fragment::RootFragment{T}
 end
-function Root(
-        se::SingularEdge{T, U}, se_classification_dict::Dict{SingularEdge{T, U}, Complex{Int64}},
-        sg::SuperGraph{T, U}
-    ) where {T, U}
-    @assert haskey(se_classification_dict, se)
-    return Root(
-        real(se_classification_dict[se]) == 1,
-        [getsingularvertex(sg, v) for v in vertices(se)],
-    )
-end
-is_primary(r::Root) = r.is_primary
-V(r::Root) = r.V
+fragment(sr::SimpleRoot) = sr.fragment
+fragments(sr::SimpleRoot) = [fragment(sr)]
+edges(sr::SimpleRoot) = edges(fragment(sr))
+is_fullgrown(::SimpleRoot) = true
+vertices(sr::SimpleRoot) = vertices(fragment(sr))
 
-vertices(r::Root) = id.(V(r))
-xs(r::Root) = x.(V(r))
-ys(r::Root) = y.(V(r))
-Base.length(r::Root) = length(r.V)
-function Eₕ(r::Root)
-    root_hvs = hypervertex.(V(r))
-    return [HyperEdge(id.(root_hvs)[i], id.(root_hvs)[i-1]) for i in 2:length(root_hvs)]
+struct CompositeRoot{T} <: Root
+    is_primary::Bool
+    fragments::Vector{RootFragment{T}}
 end
+fragments(cr::CompositeRoot) = cr.fragments
+edges(cr::CompositeRoot) = reduce(vcat, edges.(fragments(cr)))
+is_fullgrown(cr::CompositeRoot) = all(is_augmented.( edges(cr)[[1, end]] ))
+vertices(cr::CompositeRoot) = unique(reduce(vcat, vertices.(fragments(cr))))
 
 """
-    curve_length(r::Root)
+    RootSystem
 
-Calculate the physical length of a root.
+Represents a complete root system of a single plant. 
+See also [`get_rootsystems`](@ref), [`examine`](@ref) and [`curve_length`](@ref).
 """
-curve_length(r::Root) = sqrt.(diff(xs(r)) .^ 2 + diff(ys(r)) .^ 2) |> sum
-distance(r::Root) = sqrt((ys(r)[end] - ys(r)[1])^2 + (xs(r)[end] - xs(r)[1])^2)
-distance(v::SingularVertex, r::Root) = minimum(sqrt.((x(v) .- xs(r)) .^ 2 + (y(v) .- ys(r)) .^ 2))
-tortuosity(r::Root) = curve_length(r) / distance(r)
-tortuosity(rs::Vector{<:Root}) = sum(tortuosity.(rs))
-weighted_tortuosity(r::Root) = curve_length(r) * tortuosity(r)
-weighted_tortuosity(rs::Vector{<:Root}) = sum(weighted_tortuosity.(rs))
-function roughness(r::Root)
-    angles = [angle(V(r)[i], V(r)[i-1]) for i in 2:length(r)]
-    length(angles) == 1 && (return 0.0)
-    angle_changes = diff(angles)
-    return sum(angle_changes.^2) / length(angle_changes)
+struct RootSystem{T}
+    primary::Union{SimpleRoot{T}, CompositeRoot{T}}
+    laterals::Vector{Union{SimpleRoot{T}, CompositeRoot{T}}}
 end
-roughness(rs::Vector{<:Root}) = sum(roughness.(rs))
+primary(rs::RootSystem) = rs.primary
+laterals(rs::RootSystem) = rs.laterals
+roots(rs::RootSystem) = [primary(rs); laterals(rs)]
+Base.length(rs::RootSystem) = length(roots(rs))
 
+tortuosity(rg::RootGraph, rs::RootSystem) = tortuosity(rg, primary(rs)) + tortuosity(rg, laterals(rs))
+tortuosity(rg::RootGraph, rss::Vector{<:RootSystem}) = sum(tortuosity.([rg], rss))
+weighted_tortuosity(rg::RootGraph, rs::RootSystem) = weighted_tortuosity(rg, primary(rs)) + weighted_tortuosity(rg, laterals(rs))
+weighted_tortuosity(rg::RootGraph, rss::Vector{<:RootSystem}) = sum(weighted_tortuosity.([rg], rss))
 
 """
-    examine(rs)
+    examine(rg, rs)
 
 Get functional information from root systems.
 """
 function examine end
 
-function examine(rs::Vector{<:Root}; digits = 2)
-    @assert length(filter(is_primary, rs)) == 1 "A vector of `Root`s should only have one primary root"
-    @assert issorted(rs, by = is_primary, rev = true)
-
+function examine(rg::RootGraph, rs::RootSystem; digits = 2)
     f = x -> round(x; digits)
 
-    println("Primary root length: $(curve_length(rs[1]) |> f)")
-    println("Number of lateral roots: $(length(rs) - 1)")
-    println("Average lateral root length: $(sum(curve_length.(rs[2:end])) / length(rs[2:end]) |> f)")
+    println("Primary root length: $(curve_length(rg, primary(rs)) |> f)")
+    println("Number of lateral roots: $(length(laterals(rs)))")
+    println("Average lateral root length: $(sum(curve_length.([rg], laterals(rs))) / length(laterals(rs)) |> f)")
     println("Individual lateral root lengths:")
-    for (i, r) in enumerate(rs)
-        i == 1 && continue # only do lateral roots but start from i=2
-        println("Root $i: $(curve_length(rs[i]) |> f)")
+    for (i, r) in enumerate(laterals(rs))
+        println("Root $i: $(curve_length(rg, r) |> f)")
     end
     return
 end
 
-function examine(rss::Vector{<:Vector{<:Root}}; digits = 2)
+function examine(rg::RootGraph, rss::Vector{<:RootSystem}; digits = 2)
     for (i, rs) in enumerate(rss)
         println("Root system $i")
-        examine(rs; digits)
+        examine(rg, rs; digits)
         println("")
     end
     return

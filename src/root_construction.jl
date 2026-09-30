@@ -1,119 +1,181 @@
 """
-    get_roots(sg::SuperGraph, model::JuMP.Model)
+    get_rootsystems(rg::RootGraph, model::JuMP.Model)
 
-Extract the roots from a graph `sg` and its solution contained in `model`.
-
-See also [`Root`](@ref).
+Extract the rootsystems from a graph `rg` and its solution contained in `model`.
 """
-function get_roots(sg::SuperGraph, model::JuMP.Model)
-    se_classification_dict = get_se_classification_dict(sg, model)
-    polarity_classification_dict = get_polarity_classification_dict(sg, model)
-    active_edges = [e for e in E₀(sg) if abs(se_classification_dict[e]) > 0]
+function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
+    
+    # get primary roots
+    c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp])))
+    c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp₊])))
 
-    roots = Root[]
-    while !isempty(active_edges)
-        current_root = Root(active_edges[1], se_classification_dict, sg)
-        deleteat!(active_edges, 1)
+    primary_fragments = fragment(rg, true, c_counts, c₊_counts)
+    stitch_fragments!(primary_fragments)
+    primary_roots = get_roots(primary_fragments)
 
-        edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
-        while !isnothing(edge_idx)
-            grow!(current_root, active_edges[edge_idx], sg)
-            deleteat!(active_edges, edge_idx)
-            edge_idx = findfirst(e -> are_connected(current_root, e), active_edges)
-        end
-        correct_polarity!(sg, polarity_classification_dict, current_root)
-        push!(roots, current_root)
-    end
+    # get lateral roots
+    c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl])))
+    c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl₊])))
 
-    if length(filter(r -> is_primary(r), roots)) == 1
-        sort_root_system!(roots)
-        return roots
-    else
-        return separate_root_systems(sg, se_classification_dict, roots)
-    end
+    lateral_fragments = fragment(rg, false, c_counts, c₊_counts)
+    stitch_fragments!(lateral_fragments)
+    lateral_roots = get_roots(lateral_fragments)
+
+    return separate_root_systems(rg, primary_roots, lateral_roots)
 end
 
-are_connected(r::Root{T, U}, se::SingularEdge{T, U}) where {T, U} = (
-    !isempty(intersect(vertices(r)[[1, end]], vertices(se)))
+function fragment(rg::RootGraph{T, U}, is_primary::Bool, c_counts::Dict, c₊_counts::Dict) where {T, U}
+
+    fragments = RootFragment{T}[]
+
+    for c in filter(c -> c_counts[c] > 0, E₂(rg))
+        v_shared = shared_vertex(c)
+
+        for i in 1:c₊_counts[c] # connection goes from edge 1 to 2
+            add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+        end
+
+        for i in 1:(c_counts[c]-c₊_counts[c]) # connection goes from edge 2 to 1
+            add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+        end
+    end
+
+    return fragments
+end
+
+shared_vertex(c::Vector{<:AbstractEdge}) = vertices(c[1])[findfirst(v -> in(v, vertices(c[2])), vertices(c[1]))]
+function add_directed_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool,
+        c::Vector{<:RootEdge}, v_shared; switch_edges::Bool
+    )
+    if !switch_edges
+        push!(fragments, RootFragment(
+            is_primary, 
+            [
+                RootArc(c[1], keep_order = (dst(c[1]) == v_shared)),
+                RootArc(c[2], keep_order = (src(c[2]) == v_shared))
+            ])
+        )
+    else
+        push!(fragments, RootFragment(is_primary,
+            [
+                RootArc(c[2], keep_order = (dst(c[2]) == v_shared)),
+                RootArc(c[1], keep_order = (src(c[1]) == v_shared))
+            ])
+        )
+    end
+
+    return nothing
+end
+
+function stitch_fragments!(fragments::Vector{<:RootFragment})
+    growing = true
+    # keep going until all root fragments cant grow anymore
+    while growing
+        growing = false
+        for (i, fragment) in enumerate(fragments)
+            
+            f_end_idxs = findall(f -> connects_to_end(fragment, f), fragments)
+            if are_options_unambiguous(fragments[f_end_idxs]) && fragment != fragments[f_end_idxs[1]] 
+                stitch_to_end!(fragment, fragments[f_end_idxs[1]])
+                deleteat!(fragments, f_end_idxs[1])
+                
+                growing = true
+            end
+
+            f_start_idxs = findall(f -> connects_to_start(fragment, f), fragments)
+            if are_options_unambiguous(fragments[f_start_idxs]) && fragment != fragments[f_start_idxs[1]]
+                stitch_to_start!(fragment, fragments[f_start_idxs[1]]) # connect one of them
+                deleteat!(fragments, f_start_idxs[1])
+
+                growing = true
+            end
+
+        end
+    end
+
+    return nothing
+end
+
+are_options_unambiguous(xs) = (
+    (length(xs) == 1) || # there is only one option
+        (length(xs) > 1 && allequal(xs)) # all options are equal
 )
 
-function grow!(r::Root{T, U}, se::SingularEdge{T, U}, sg::SuperGraph{T, U}) where {T, U}
-    new_vertex_idx = findfirst(x -> !(x in vertices(r)[[1, end]]), vertices(se))
-    if isnothing(new_vertex_idx)
-        @warn "Loop found in root"
-        return nothing
-        # new_vertex = vertices(r)[1]
-    else
-        new_vertex = vertices(se)[new_vertex_idx]
+connects_to_end(f1::RootFragment, f2::RootFragment) = edges(f1)[end] == edges(f2)[1]
+connects_to_start(f1::RootFragment, f2::RootFragment) = edges(f1)[1] == edges(f2)[end]
+
+stitch_to_end!(f1::RootFragment, f2::RootFragment) = append!(f1.edges, f2.edges[2:end])
+stitch_to_start!(f1::RootFragment, f2::RootFragment) = prepend!(f1.edges, f2.edges[1:end-1])
+
+function get_roots(fs::Vector{RootFragment{T}}) where {T}
+    roots = Union{SimpleRoot{T}, CompositeRoot{T}}[]
+    # roots consisting of a single root fragment
+    complete_fragments = filter(is_fullgrown, fs)
+    append!(roots, Root[SimpleRoot(is_primary(f), f) for f in complete_fragments])
+
+    # roots consisting of multiple root fragments
+    incomplete_fragments = filter(!is_fullgrown, fs)
+
+    # keep going until all incomplete root fragments are used
+    while !isempty(incomplete_fragments)
+
+        # instantiate new root
+        fragment = incomplete_fragments[1]
+        deleteat!(incomplete_fragments, 1)
+        root = CompositeRoot(is_primary(fragment), [fragment])
+
+        growing = true # needed in case of loops :[
+        # grow until complete
+        while !is_fullgrown(root) && growing
+            fragment = fragments(root)[end]
+            f_end_idxs = findall(f -> connects_to_end(fragment, f), incomplete_fragments)
+            if !isempty(f_end_idxs)
+                push!(fragments(root), incomplete_fragments[f_end_idxs[1]])
+                deleteat!(incomplete_fragments, f_end_idxs[1])
+            end
+
+            fragment = fragments(root)[1]
+            f_start_idxs = findall(f -> connects_to_start(fragment, f), incomplete_fragments)
+            if !isempty(f_start_idxs)
+                pushfirst!(fragments(root), incomplete_fragments[f_start_idxs[1]])
+                deleteat!(incomplete_fragments, f_start_idxs[1])
+            end
+
+            growing = !(isempty(f_end_idxs) && isempty(f_start_idxs))
+        end
+        push!(roots, root)
     end
 
-    is_upstream = vertices(r)[1] in vertices(se)
-    if is_upstream
-        pushfirst!(V(r), getsingularvertex(sg, new_vertex))
-    else
-        push!(V(r), getsingularvertex(sg, new_vertex))
-    end
-
-    return nothing
-end
-
-function correct_polarity!(sg::SuperGraph, polarity_classification_dict::Dict, r::Root)
-    se = E₀(sg)[findfirst(e -> issetequal(vertices(e), vertices(r)[1:2]), E₀(sg))]
-    polarity_match = polarity(V(r)[1:2]...) == polarity_classification_dict[se]
-    if !polarity_match
-        reverse!(V(r))
-    end
-
-    return nothing
+    return roots
 end
 
 # divide roots into separate root systems
-function separate_root_systems(sg::SuperGraph, se_classification_dict::Dict, rs::Vector{<:Root})
-    primary_roots = filter(is_primary, rs)
-    lateral_roots = filter(!is_primary, rs)
-    root_systems = [[pr] for pr in primary_roots]
+function separate_root_systems(rg::RootGraph, primary_roots::Vector{<:Root}, lateral_roots::Vector{<:Root})
+    lateral_match_dict = Dict{Root, Int64}()
 
     for lateral_root in lateral_roots
-        found_exact_match = false
+        start_edge = edges(lateral_root)[1]
+        if vertices(start_edge)[1] == -3 # lateral splits from a primary root
+            lateral_match_dict[lateral_root] = findfirst(
+                r -> vertices(start_edge)[2] in vertices(r), # first vertex is -3
+                primary_roots
+            )
+        else # lateral appears straight up out of nowhere
+            lateral_match_dict[lateral_root] = findmin(
+                pr -> distance(rg, V₀(rg, lateral_root)[1], pr), 
+                primary_roots
+            )[2] # findmin returns (element, idx)
+        end
+    end
+
+    rootsystems = [
+        RootSystem(primary_root, filter(r -> lateral_match_dict[r] == i, lateral_roots)) 
         for (i, primary_root) in enumerate(primary_roots)
+    ]
 
-            pr_nb_vertices = reduce(vcat, V.([sg], hypervertex.(V(primary_root))))
-            roots_match = [
-                sv_lat in pr_nb_vertices && !isnothing(findfirst(se -> src(se) == -3, edges(sv_lat))) &&
-                    imag(
-                        se_classification_dict[
-                            edges(sv_lat)[findfirst(se -> src(se) == -3, edges(sv_lat))],
-                        ]
-                    ) == 1
-                    for sv_lat in V(lateral_root)[[1, end]]
-            ] |> all
-
-            if roots_match
-                push!(root_systems[i], lateral_root)
-                found_exact_match = true
-                break
-            end
-        end
-
-        if !found_exact_match
-            i = findmin(pr -> distance(V(lateral_root)[1], pr), primary_roots)[2]
-            push!(root_systems[i], lateral_root)
-        end
+    for rs in rootsystems
+        sort!(laterals(rs), by = r -> curve_length(rg, r), rev = true)
     end
-
-    for rs in root_systems
-        sort_root_system!(rs)
-    end
-
-    return root_systems
-end
-
-function sort_root_system!(rs::Vector{<:Root})
-    sort!(rs, by = is_primary, rev = true)
-    if length(rs) > 1
-        @assert !is_primary(rs[2]) "Root systems should only contain one primary root"
-        sort!(@view(rs[2:end]), by = curve_length, rev = true)
-    end
-
-    return nothing
+    
+    return rootsystems
 end

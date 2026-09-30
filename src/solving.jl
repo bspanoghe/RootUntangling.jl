@@ -1,10 +1,10 @@
 """
     solve_rsa(
-        sg::SuperGraph; optimizer, add_momentum::Bool = true, time_limit = missing, hotstart_time = 0,
+        rg::RootGraph; optimizer, time_limit = missing, hotstart_time = 0,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.95, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, α_down = -pi/2, ϵ = 1e-5
     )
 
-Solve which root system architecture is represented by the graph `sg`.
+Solve which root system architecture is represented by the graph `rg`.
 
 The problem is formulated as a Integer Quadratic Program (IQP) written to allow Integer Linear Program (ILP) solvers.
 
@@ -22,57 +22,54 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
 function solve_rsa(
-        sg::SuperGraph; optimizer, time_limit = missing,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5, ρₒ_base = exp(1),
-        α_down = -pi / 2, ϵ = 1e-3
+        rg::RootGraph; optimizer, time_limit = missing, max_roots = 3,
+        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₒ = 0.1, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5,
+        w_gp = 1.0, w_gl = 1.0, ρₒ_base = exp(1),  α_down = -pi / 2, ϵ = 1e-3
     )
 
     @assert ρₒ_base >= 1 "The base for the overlap probability must be greater or equal than 1."
 
     # check for NN prediction data #! remove for final version
-    NN_pred = pred_primary(Eₕ₀(sg)[1]) |> !ismissing
+    NN_pred = pred_primary(E₀(rg)[1]) |> !ismissing
 
     # name special vertices
-    vₐ = V₊(sg)[1]
-    vₑ = V₊(sg)[2] # extinction == disappearance
-    vₛ = V₊(sg)[3]
+    vₐ = V₊(rg)[1]
+    vₑ = V₊(rg)[2] # extinction == disappearance
+    vₛ = V₊(rg)[3]
 
     # define model
     model = Model(optimizer)
 
     # define the model variables
-    connections = E₂(sg)
+    connections = E₂(rg)
 
-    n_v = length(V₀(sg))
-    n_e = length(E(sg))
-    n_he = length(Eₕ₀(sg))
+    n_e = length(E(rg))
     n_c = length(connections)
 
-    @variable(model, va[1:n_v], Bin) # is vertex active (part of the root)
-    @variable(model, vp[1:n_v], Bin) # is vertex part of the primary root
+    @variable(model, ea[1:n_e], Bin) # does edge contain roots
+    @variable(model, epa[1:n_e], Bin) # does edge contain primary roots
+    @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of primary roots in edge
+    @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of roots in edge following positive direction
+    @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of lateral roots in edge
+    @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of roots in edge following positive direction
 
-    @variable(model, ea[1:n_e], Bin) # is the edge active (part of the root)
-    @variable(model, ep[1:n_e], Bin) # is the edge part of the primary root
-    @variable(model, e₊[1:n_e], Bin) # is this a positive edge (should it follow the natural polarity of the edge)
-    # note: the natural polarity of an edge is defined as going from the vertex with the lowest id to the one with the highest id
-
-    @variable(model, f[1:n_c], Bin) # are these edges part of the same root
-
-    @variable(model, he[1:n_he], Bin) # is this hyperedge active
-    NN_pred && @variable(model, heₚ[1:n_he], Bin) # is this a primary hyperedge
+    @variable(model, cp[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in primary connection
+    @variable(model, cp₊[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in primary connection
+    @variable(model, cl[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in lateral connection
+    @variable(model, cl₊[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in lateral connection
 
     # connect model variables to graph's edges
-    va2f = Dict([V₀(sg)[i] => va[i] for i in eachindex(V₀(sg))])
-    vp2f = Dict([V₀(sg)[i] => vp[i] for i in eachindex(V₀(sg))])
+    ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
+    epa2f = Dict([E(rg)[i] => epa[i] for i in eachindex(E(rg))])
+    ep2f = Dict([E(rg)[i] => ep[i] for i in eachindex(E(rg))])
+    ep₊2f = Dict([E(rg)[i] => ep₊[i] for i in eachindex(E(rg))])
+    el2f = Dict([E(rg)[i] => el[i] for i in eachindex(E(rg))])
+    el₊2f = Dict([E(rg)[i] => el₊[i] for i in eachindex(E(rg))])
 
-    ea2f = Dict([E(sg)[i] => ea[i] for i in eachindex(E(sg))])
-    ep2f = Dict([E(sg)[i] => ep[i] for i in eachindex(E(sg))])
-    e₊2f = Dict([E(sg)[i] => e₊[i] for i in eachindex(E(sg))])
-
-    c2f = Dict([connections[i] => f[i] for i in eachindex(connections)])
-
-    hea2f = Dict([Eₕ₀(sg)[i] => he[i] for i in eachindex(Eₕ₀(sg))])
-    NN_pred && (hep2f = Dict(Eₕ₀(sg)[i] => heₚ[i] for i in eachindex(Eₕ₀(sg))))
+    cp2f = Dict([connections[i] => cp[i] for i in eachindex(connections)])
+    cp₊2f = Dict([connections[i] => cp₊[i] for i in eachindex(connections)])
+    cl2f = Dict([connections[i] => cl[i] for i in eachindex(connections)])
+    cl₊2f = Dict([connections[i] => cl₊[i] for i in eachindex(connections)])
 
     # define objective
     @objective(
@@ -80,99 +77,116 @@ function solve_rsa(
         Max,
         # appearance penalties
         sum(
-            ea2f[e] * log(ρₐ / (1 - ρₐ))
-                for e in E(vₐ)
+            (ep2f[e] + el2f[e]) * log(ρₐ / (1 - ρₐ))
+            for e in E(vₐ)
         ) +
-        # standard hyperedges should be active
-            sum(
-            hea2f[he] * log(ρₕ / (1 - ρₕ))
-                for he in Eₕ₀(sg)
-        ) +
-        # similar angles
+        # standard rootedges should be active
         sum(
-            c2f[c] * log(ρₘ(sg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(sg, v, c; ρₘ_max, ϵ)))
-            for v in V₀(sg) for c in E₂(v) if !any([is_augmented(e) for e in c])
+            ea2f[e] * log(ρₕ / (1 - ρₕ))
+            for e in E₀(rg)
+        ) + 
+        # overlap probability
+        sum(
+            (ep2f[e] + el2f[e]) * log(ρₒ / (1 - ρₒ)) #! -1?
+            for e in E₀(rg)
         ) +
-            # gravitropy (needs to be split up into two sums to remain a linear objective)
-            sum(
-            e₊2f[e] * log(ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, false; ρᵧ_max, ϵ)))
-                for e in E₀(sg)
+        # primary gravitropy (needs to be split up into two sums to remain a linear objective)
+        w_gp * sum(
+            ep₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
         ) +
-            sum(
-            (ea2f[e] - e₊2f[e]) * log(ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(sg, e, α_down, true; ρᵧ_max, ϵ)))
-                for e in E₀(sg)
+        w_gp * sum(
+            (ep2f[e] - ep₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
+        ) + 
+        # lateral gravitropy (needs to be split up into two sums to remain a linear objective)
+        w_gl * sum(
+            el₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
         ) +
-            # NN pred
-            (
-            !NN_pred ? 0 : sum(
-                    hep2f[he] * log(ρₙₙ(he; ρₙₙ_max, ϵ) / (1 - ρₙₙ(he; ρₙₙ_max, ϵ)))
-                    for he in Eₕ₀(sg)
-                )
-        ) +
-            # overlap probability
-            sum(
-            va2f[v] * log(ρ₀(v; ρₒ_base, ϵ) / (1 - ρ₀(v; ρₒ_base, ϵ)))
-                for v in V₀(sg)
+        w_gl * sum(
+            (el2f[e] - el₊2f[e]) * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            for e in E₀(rg)
+        ) + 
+        # angle differences
+        sum(
+            (cp2f[c] + cl2f[c]) * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
+            for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
         )
     )
 
+    # NN pred
+    if NN_pred
+        set_objective_function(
+            model,
+            objective_function(model) + sum(
+                epa2f[e] * log(ρₙₙ(e; ρₙₙ_max, ϵ) / (1 - ρₙₙ(e; ρₙₙ_max, ϵ)))
+                for e in E₀(rg)
+            )
+        )
+    end
+    
     # # define constraints
 
     # ## Flow formalism
 
     # ### For a standard vertex:
-    for v in V₀(sg)
-        # It can only be classified as primary if active
-        @constraint(model, va2f[v] >= vp2f[v])
-        # It is an active vertex ⇔ it is connected to two active edges
-        @constraint(model, 2 * va2f[v] == sum(ea2f[e] for e in E(v)))
-        # It is an active primary vertex ⇔ it is connected to two active primary edges
-        @constraint(model, 2 * vp2f[v] == sum(ep2f[e] for e in E(v)))
-        # It has an incoming and an outgoing edge
-        @constraint(model, sum((e₊2f[e] - (ea2f[e] - e₊2f[e])) * polarity(e, v) for e in E(v)) == 0)
-
-        # It is active ⇔ It has one active connection
-        @constraint(model, va2f[v] == sum(c2f[c] for c in E₂(v)))
-        
-        # For all its edges:
+    for v in V₀(rg)
+        # For all of its edges:
         for e in E(v)
-            # It is active ⇔ One connection containing this vertex and edge is active
-            @constraint(model, ea2f[e] == sum(c2f[c] for c in E₂(v, e)))
+            # it contains as many roots as the sum of its connections
+            @constraint(model, ep2f[e] == sum(cp2f[c] for c in E₂(v, e)))
+            @constraint(model, el2f[e] == sum(cl2f[c] for c in E₂(v, e)))
+
+            # it has as many roots in a given direction as the sum of its connected roots in that direction
+            @constraint(
+                model, 
+                (ep₊2f[e] - (ep2f[e] - ep₊2f[e])) * direction(v, e) == 
+                    sum((cp₊2f[c] - (cp2f[c] - cp₊2f[c])) * direction(c, e) for c in E₂(v, e))
+            )
+            @constraint(
+                model,
+                (el₊2f[e] - (el2f[e] - el₊2f[e])) * direction(v, e) == 
+                    sum((cl₊2f[c] - (cl2f[c] - cl₊2f[c])) * direction(c, e) for c in E₂(v, e))
+            )
         end
     end
 
     # ### For any edge:
-    for e in E(sg)
-        # It can only be classified if active
-        @constraint(model, ea2f[e] >= ep2f[e])
-        @constraint(model, ea2f[e] >= e₊2f[e])
+    for e in E(rg)
+        # It can only be classified as active if it contains roots
+        @constraint(model, ea2f[e] <= (ep2f[e] + el2f[e]))
+        @constraint(model, epa2f[e] <= ep2f[e])
+
+        # The amount of roots in positive direction is no larger than the amount of total roots
+        @constraint(model, ep₊2f[e] <= ep2f[e])
+        @constraint(model, el₊2f[e] <= el2f[e])
     end
 
-    # ### For a hyperedge:
-    for he in Eₕ₀(sg)
-        # It is active => at least one of its edges is active
-        @constraint(model, hea2f[he] <= sum(ea2f[e] for e in E(sg, he)))
-        # It is classified as primary => at least one of its edges is classified as primary
-        NN_pred && @constraint(model, hep2f[he] <= sum(ep2f[e] for e in E(sg, he))) #! model can still choose to not classify he as primary
+    for c in E₂(rg)
+        # The amount of connections in positive directions is no larger than the amount of connections
+        @constraint(model, cp₊2f[c] <= cp2f[c])
+        @constraint(model, cl₊2f[c] <= cl2f[c])
     end
 
     # ## Special vertices
 
-    # note: all augmented edges have a positive polarity by design
     # The appearance vertex has no incoming edges (edges are either inactive or follow natural polarity)
-    @constraint(model, sum((ea2f[e] - e₊2f[e]) for e in E(vₐ)) == 0)
+    @constraint(model, sum((ep2f[e] - ep₊2f[e]) for e in E(vₐ)) == 0)
+    @constraint(model, sum((el2f[e] - el₊2f[e]) for e in E(vₐ)) == 0)
     # The extinction vertex has no outgoing edges (edges are either inactive or opposite natural polarity)
-    @constraint(model, sum(e₊2f[e] for e in E(vₑ)) == 0)
+    @constraint(model, sum(ep₊2f[e] for e in E(vₑ)) == 0)
+    @constraint(model, sum(el₊2f[e] for e in E(vₑ)) == 0)
     # The splitting vertex has no incoming edges (edges are either inactive or follow natural polarity)
-    @constraint(model, sum((ea2f[e] - e₊2f[e]) for e in E(vₛ)) == 0)
+    @constraint(model, sum((ep2f[e] - ep₊2f[e]) for e in E(vₛ)) == 0)
+    @constraint(model, sum((el2f[e] - el₊2f[e]) for e in E(vₛ)) == 0)
 
     # ## Prerequisite for division
 
-    # A vertex can only split if its hypervertex is part of the primary root
-    # i.e. lateral root segments can only appear in a hypervertex with an edge classified as a primary root
-    for v in inner_vertices(sg) # outer nodes can never split
+    # A vertex can only split if it's part of the primary root
+    for v in inner_vertices(rg) # outer nodes can never split
         e_vₛ = edges(v)[findfirst(e -> id(vₛ) ∈ vertices(e), edges(v))] # edge between v and vₛ
-        @constraint(model, ea2f[e_vₛ] <= sum(vp2f[v_roommate] for v_roommate in V(sg, Vₕ(v))))
+        @constraint(model, el2f[e_vₛ] <= sum(ep2f[e] for e in E(v))) #! only allows one split event in vertex (otherwise multiply right side by constant)
     end
 
     # Primary root segments cannot form from division
@@ -189,15 +203,6 @@ function solve_rsa(
         @constraint(model, sum(ep2f[e] for e in E(vₑ)) == num_roots)
     end
 
-    # symmetry breaking
-    for hv in Vₕ₀(sg)
-        svs = V(sg, hv)
-        for i in 2:length(svs)
-            @constraint(model, va2f[svs[i]] <= va2f[svs[i-1]])
-            @constraint(model, vp2f[svs[i]] <= vp2f[svs[i-1]])
-        end
-    end
-
     # # extra solver options
     ismissing(time_limit) || set_time_limit_sec(model, time_limit)
 
@@ -208,12 +213,12 @@ function solve_rsa(
     return model
 end
 
-function solve_rsa(sgs::Vector{SuperGraph{T, U}}; kwargs...) where {T, U}
-    models = Vector{JuMP.Model}(undef, length(sgs))
+function solve_rsa(rgs::Vector{RootGraph{T, U}}; kwargs...) where {T, U}
+    models = Vector{JuMP.Model}(undef, length(rgs))
 
-    for (i, sg) in enumerate(sgs)
-        @info "Solving graph $i/$(length(sgs))"
-        models[i] = solve_rsa(sg; kwargs...)
+    for (i, rg) in enumerate(rgs)
+        @info "Solving graph $i/$(length(rgs))"
+        models[i] = solve_rsa(rg; kwargs...)
     end
 
     return models
@@ -224,16 +229,12 @@ end
 bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # change in angle probability
-ρₘ(sg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(sg, c..., id(v)) |> p -> bound(p; ϵ)
+ρₘ(rg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(rg, c..., id(v)) |> p -> bound(p; ϵ)
 
 # gravitropic growth probability
-ρᵧ(sg, e, α_down, reverse_order; ρᵧ_max, ϵ) = (
-    ρᵧ_max * (1 + cosine_similarity(sg, e, α_down; reverse_order)) / 2
+ρᵧ(rg, e, α_down, reverse_order; ρᵧ_max, ϵ) = (
+    ρᵧ_max * (1 + cosine_similarity(rg, e, α_down; reverse_order)) / 2
 ) |> p -> bound(p; ϵ)
 
 # NN pred primary probability
-ρₙₙ(he; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(he) |> p -> bound(p; ϵ)
-
-# root overlap probability
-ρ₀(sv::SingularVertex; ρₒ_base, ϵ) = 0.5 * ρₒ_base^(-order(sv)) |> p -> bound(p; ϵ)
-order(sv::SingularVertex) = id(sv) - vertices(hypervertex(sv))[1]
+ρₙₙ(re; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p; ϵ)

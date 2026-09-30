@@ -1,121 +1,80 @@
-# # SuperGraph plotting
+# # RootGraph plotting
 
 # ## Type recipes for vertices and edges
 # ### Vertices
-Makie.convert_arguments(::Type{<:Scatter}, av::AbstractVertex) = (x(av), y(av))
-Makie.convert_arguments(::Type{<:Scatter}, avs::Vector{<:AbstractVertex}) = (x.(avs), y.(avs))
+Makie.convert_arguments(::Type{<:Scatter}, rv::RootVertex) = (x(rv), y(rv))
+Makie.convert_arguments(::Type{<:Scatter}, rvs::Vector{<:RootVertex}) = (x.(rvs), y.(rvs))
 
 # ### Edges
-Makie.convert_arguments(::Type{<:Lines}, sg::SuperGraph, ae::AbstractEdge) = (xs(sg, ae), ys(sg, ae))
-Makie.convert_arguments(::Type{<:Lines}, sg::SuperGraph, aes::Vector{<:AbstractEdge}) = (
-    reduce(vcat, [[xs(sg, ae); NaN] for ae in aes]), reduce(vcat, [[ys(sg, ae); NaN] for ae in aes])
+Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, re::RootEdge) = (xs(rg, re), ys(rg, re))
+Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, res::Vector{<:RootEdge}) = (
+    reduce(vcat, [[xs(rg, re); NaN] for re in res]), reduce(vcat, [[ys(rg, re); NaN] for re in res])
 )
 
 
-# ## SuperGraph #! TODO: use Makie's @recipe
-alpha(he::HyperEdge, standard_alpha = 1.0, augmented_alpha = 0.05) = is_augmented(he) ? augmented_alpha : standard_alpha
+# ## RootGraph #! TODO: use Makie's @recipe
+alpha(re::RootEdge, standard_alpha = 1.0, augmented_alpha = 0.05) = is_augmented(re) ? augmented_alpha : standard_alpha
 
 # ### No classification
 function graphplot!(
-        ax::Makie.Axis, sg::SuperGraph; standard_alpha = 1.0, 
+        ax::Makie.Axis, rg::RootGraph; standard_alpha = 1.0, 
         augmented_alpha = 0.05, vertex_kwargs = Dict([]), edge_kwargs = Dict([])
     )
     color = [
         # edge is 2 vertices + hidden NaN vertex
-        fill(RGBAf(0, 0, 0, alpha(he, standard_alpha, augmented_alpha)), 3)
-        for he in Eₕ(sg)
+        fill(RGBAf(0, 0, 0, alpha(re, standard_alpha, augmented_alpha)), 3)
+        for re in E(rg)
     ] |> x -> reduce(vcat, x)
 
-    lines!(ax, sg, Eₕ(sg); color, edge_kwargs...)
-    scatter!(ax, Vₕ(sg); color = :grey, markersize = 8, vertex_kwargs...)
+    lines!(ax, rg, E(rg); color, edge_kwargs...)
+    scatter!(ax, V(rg); color = :grey, markersize = 5, vertex_kwargs...)
 end
 
 function graphplot(
-        sg::SuperGraph; standard_alpha = 1.0, augmented_alpha = 0.05, 
-        size = (600, 400), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
+        rg::RootGraph; standard_alpha = 1.0, augmented_alpha = 0.05, 
+        size = (600, 600), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
 
-    graphplot!(ax, sg; standard_alpha, augmented_alpha, vertex_kwargs, edge_kwargs)
+    graphplot!(ax, rg; standard_alpha, augmented_alpha, vertex_kwargs, edge_kwargs)
 
     return f
 end
 
-# ### With hyperedge classification
+# ### With rootedge classification
 function graphplot(
-        sg::SuperGraph, he_classification_dict::Dict{<:HyperEdge, <:Complex}; standard_alpha = 1.0,
+        rg::RootGraph, model::JuMP.Model; standard_alpha = 1.0,
         augmented_alpha = 0.1, size = (600, 400), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     )
+
+    rd = get_result_dict(rg, model)
 
     classification_edge_kwargs = Dict(
         :color => [
             fill(
-                (real(he_classification_dict[he]) > 0) * RGBAf(1.0, 0, 0, alpha(he, standard_alpha, augmented_alpha)) + 
-                    (imag(he_classification_dict[he]) > 0) * RGBAf(0, 0, 1.0, alpha(he, standard_alpha, augmented_alpha)),
+                rd[re][:ep] * RGBAf(1.0, 0, 0, alpha(re, standard_alpha, augmented_alpha)) + 
+                    rd[re][:el] * RGBAf(0, 0, 1.0, alpha(re, standard_alpha, augmented_alpha)),
                 3
             )
-            for he in Eₕ(sg)
+            for re in E(rg)
         ] |> x -> reduce(vcat, x),
         :linewidth => [
-            fill(abs(he_classification_dict[he]), 3) for he in Eₕ(sg)
+            fill(rd[re][:en], 3) for re in E(rg)
         ] |> x -> reduce(vcat, x)
     )
-    classification_vertex_kwargs = Dict(
-        :color => :grey,
-        :markersize => 8,
-    )
+    classification_vertex_kwargs = Dict(:color => :grey)
 
     edge_kwargs = merge(edge_kwargs, classification_edge_kwargs)
     vertex_kwargs = merge(vertex_kwargs, classification_vertex_kwargs)
 
-    return graphplot(sg; augmented_alpha, size, edge_kwargs, vertex_kwargs, kwargs...)
+    return graphplot(rg; augmented_alpha, size, edge_kwargs, vertex_kwargs, kwargs...)
 end
-
-# ### With num_hypotheses classification
-"""
-    hypothesis_plot(sg::SuperGraph)
-
-Visualise the maximum allowed number of roots per segment of a graph.
-"""
-function hypothesis_plot(sg::SuperGraph; size = (600, 400), kwargs...)
-    f = Figure(; size)
-    ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-
-    nₕs = [
-        maximum([length(vertices(hv)) for hv in gethypervertex.([Vₕ(sg)], vertices(he))])
-            for he in Eₕ₀(sg)
-    ]
-    ΔH = 360 / (maximum(nₕs) + 1)
-
-    hue(i, ΔH) = ΔH * i
-    edge_kwargs = Dict(
-        :linewidth => [
-            fill(nₕ == 1 ? 3 : width(he) / 2, 3)
-            for (he, nₕ) in zip(Eₕ₀(sg), nₕs)
-        ] |> x -> reduce(vcat, x),
-        :color => [
-            fill(HSVA(hue(nₕ, ΔH), 1, 0.75, alpha(he, 1.0, 0.0)), 3)
-            for (he, nₕ) in zip(Eₕ₀(sg), nₕs)
-        ] |> x -> reduce(vcat, x),
-    )
-
-    lines!(ax, sg, Eₕ₀(sg); edge_kwargs...)
-    label_lines = [lines!(ax, NaN, NaN, color = HSV(hue(i, ΔH), 1, 0.75)) for i in 1:maximum(nₕs)]
-    Legend(
-        f[1, 2],
-        label_lines,
-        string.(1:maximum(nₕs))
-    )
-
-    return f
-end
-
 
 # ### With annotation classification
-function add_annotation!(ax::Makie.Axis, sg::SuperGraph, hes::Vector{<:HyperEdge}; fontsize)
-    annotation_coords = [(mean(xs(sg, he)), mean(ys(sg, he))) for he in hes]
-    annotation_texts = [string(segment_id(he)) for he in hes]
+function add_annotation!(ax::Makie.Axis, rg::RootGraph, res::Vector{<:RootEdge}; fontsize)
+    annotation_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in res]
+    annotation_texts = [string(segment_id(re)) for re in res]
     annotation!(ax, annotation_coords; text = annotation_texts, shrink = (0, 0), color = :red, fontsize)
 
     return nothing
@@ -125,49 +84,51 @@ function annotation_plot(sg::SuperGraph; size = (600, 400), fontsize = 4, edge_k
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
 
-    color(he) = ismissing(pred_primary(he)) ? HSV(0, 1, 0) : HSV(200, 1, pred_primary(he))
+    color(re) = ismissing(pred_primary(re)) ? HSV(0, 1, 0) : HSV(200, 1, pred_primary(re))
 
-    for he in Eₕ₀(sg)
-        lines!(ax, sg, he; color = color(he), edge_kwargs...)
+    for re in Eₕ₀(rg)
+        lines!(ax, rg, re; color = color(re), edge_kwargs...)
     end
 
-    add_annotation!(ax, sg, Eₕ₀(sg); fontsize)
+    add_annotation!(ax, rg, Eₕ₀(rg); fontsize)
 
     return f
 end
 
 # # Root plotting
 # ## Type recipe for single roots
-Makie.convert_arguments(::Type{<:Lines}, r::Root) = (xs(r), ys(r))
+Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, r::Root) = (xs(rg, r), ys(rg, r))
 
 # ## Root systems
-function rootplot!(ax::Makie.Axis, rs::Vector{<:Root}; kwargs...)
-    for (i, r) in enumerate(rs)
-        linestyle = is_primary(r) ? :solid : :dot
-        color = is_primary(r) ? HSV(0, 1, 0) : HSV(range(0, 360, length = length(rs)+1)[i], 1, 0.75)
-        lines!(ax, r; linestyle, color, label = "$i", linewidth = 3, kwargs...)
+function rootplot!(ax::Makie.Axis, rg::RootGraph, rs::RootSystem; kwargs...)
+    r = primary(rs)
+    lines!(ax, rg, r; color = HSV(0, 1, 0), linestyle = :solid, label = "0", linewidth = 2, kwargs...)
+
+    for (i, r) in enumerate(laterals(rs))
+        color = HSV(range(0, 360, length = length(rs))[i], 1, 0.75)
+        lines!(ax, rg, r; color, linestyle = :dot, label = "$i", linewidth = 2, kwargs...)
     end
 end
 
-function rootplot(rs::Vector{<:Root}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+function rootplot(rg::RootGraph, rs::RootSystem; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-    rootplot!(ax, rs; line_kwargs...)
+    rootplot!(ax, rg, rs; line_kwargs...)
 
     return f
 end
 
 # ### Multiple (entangled) root systems
-function rootplot!(ax::Makie.Axis, rss::Vector{<:Vector{<:Root}}; line_kwargs::Dict = Dict(), kwargs...)
+function rootplot!(ax::Makie.Axis, rg::RootGraph, rss::Vector{<:RootSystem}; line_kwargs::Dict = Dict(), kwargs...)
     for rs in rss
-        rootplot!(ax, rs; line_kwargs...)
+        rootplot!(ax, rg, rs; line_kwargs...)
     end
 end
 
-function rootplot(rss::Vector{<:Vector{<:Root}}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+function rootplot(rg::RootGraph, rss::Vector{<:RootSystem}; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
-    rootplot!(ax, rss; line_kwargs...)
+    rootplot!(ax, rg, rss; line_kwargs...)
 
     return f
 end
@@ -188,7 +149,7 @@ function rootplot(root_systems::Vector{<:Vector{<:Vector{<:Root}}}; size = (600,
 end
 
 # ### annotated rootplot
-function annotation_plot(sg::SuperGraph, root_system::Vector{<:Vector{<:Root}};
+function annotation_plot(rg::RootGraph, root_system::Vector{<:Vector{<:Root}};
         size = (600, 400), fontsize = 6, edge_kwargs::Dict = Dict(), kwargs...
     )
     f = Figure(; size)
@@ -198,41 +159,41 @@ function annotation_plot(sg::SuperGraph, root_system::Vector{<:Vector{<:Root}};
         ax, sg, standard_alpha = 0.5, augmented_alpha = 0.0, vertex_kwargs = Dict(:markersize => 3.0)
     )
     rootplot!(ax, root_system; edge_kwargs...)
-    add_annotation!(ax, sg, Eₕ₀(sg); fontsize)
+    add_annotation!(ax, rg, Eₕ₀(rg); fontsize)
 
     return f
 end
 
-function annotation_plot(sg::SuperGraph, root_systems::Vector{<:Vector{<:Vector{<:Root}}};
+function annotation_plot(rg::RootGraph, root_systems::Vector{<:Vector{<:Vector{<:Root}}};
         size = (600, 400), fontsize = 6, edge_kwargs::Dict = Dict(), kwargs...
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
 
     graphplot!(
-        ax, sg, standard_alpha = 0.5, augmented_alpha = 0.0, vertex_kwargs = Dict(:markersize => 3.0)
+        ax, rg, standard_alpha = 0.5, augmented_alpha = 0.0, vertex_kwargs = Dict(:markersize => 3.0)
     )
     
     for root_system in root_systems
         rootplot!(ax, root_system; edge_kwargs...)
-        add_annotation!(ax, sg, Eₕ₀(sg); fontsize)
+        add_annotation!(ax, rg, Eₕ₀(rg); fontsize)
     end
 
     return f
 end
 
-function annotation_plot(sgs::Vector{<:SuperGraph}, root_systems::Vector{<:Vector{<:Vector{<:Root}}};
+function annotation_plot(rgs::Vector{<:RootGraph}, root_systems::Vector{<:Vector{<:Vector{<:Root}}};
         size = (600, 400), fontsize = 6, edge_kwargs::Dict = Dict(), kwargs...
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
     
-    for (sg, root_system) in zip(sgs, root_systems)
+    for (rg, root_system) in zip(rgs, root_systems)
         graphplot!(
-            ax, sg, standard_alpha = 0.5, augmented_alpha = 0.0, vertex_kwargs = Dict(:markersize => 3.0)
+            ax, rg, standard_alpha = 0.5, augmented_alpha = 0.0, vertex_kwargs = Dict(:markersize => 3.0)
         )
         rootplot!(ax, root_system; edge_kwargs...)
-        add_annotation!(ax, sg, Eₕ₀(sg); fontsize)
+        add_annotation!(ax, rg, Eₕ₀(rg); fontsize)
     end
 
     return f
