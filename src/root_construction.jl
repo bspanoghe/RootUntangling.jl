@@ -7,92 +7,36 @@ function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
     
     # get primary roots
     c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp])))
-    e_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep])))
-    e₊_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep₊])))
-    e₋_counts = Dict(E(rg) .=> round.(Int64, value.(model[:ep]) - value.(model[:ep₊])))
+    c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp₊])))
 
-    @debug "It begins"
-    primary_fragments = fragment(rg, true, c_counts, e_counts, e₊_counts, e₋_counts)
-    @debug "The first gate"
+    primary_fragments = fragment(rg, true, c_counts, c₊_counts)
     stitch_fragments!(primary_fragments)
-    @debug "The second gate"
     primary_roots = get_roots(primary_fragments)
-    @debug "The third gate"
 
     # get lateral roots
     c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl])))
-    e_counts = Dict(E(rg) .=> round.(Int64, value.(model[:el])))
-    e₊_counts = Dict(E(rg) .=> round.(Int64, value.(model[:el₊])))
-    e₋_counts = Dict(E(rg) .=> round.(Int64, value.(model[:el]) - value.(model[:el₊])))
+    c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl₊])))
 
-    lateral_fragments = fragment(rg, true, c_counts, e_counts, e₊_counts, e₋_counts)
-    @debug "The fourth gate"
+    lateral_fragments = fragment(rg, false, c_counts, c₊_counts)
     stitch_fragments!(lateral_fragments)
-    @debug "The fifth gate"
     lateral_roots = get_roots(lateral_fragments)
-    @debug "The final gate"
 
     return separate_root_systems(rg, primary_roots, lateral_roots)
 end
 
-function fragment(rg::RootGraph{T, U}, is_primary::Bool,
-        c_counts::Dict, e_counts::Dict, e₊_counts::Dict, e₋_counts::Dict
-    ) where {T, U}
+function fragment(rg::RootGraph{T, U}, is_primary::Bool, c_counts::Dict, c₊_counts::Dict) where {T, U}
 
-    fragments = RootFragment[]
+    fragments = RootFragment{T}[]
 
     for c in filter(c -> c_counts[c] > 0, E₂(rg))
         v_shared = shared_vertex(c)
 
-        if c_counts[c] ∈ [e_counts[c[1]], e_counts[c[2]]] # connection is fully explained by an edge
-            
-            if c_counts[c] == e_counts[c[1]] # first edge fully explains connection
-                e = c[1]
-                switches = [
-                    [dst(e) != v_shared for _ in 1:e₊_counts[e]]; # root follows direction of edge
-                    [dst(e) == v_shared for _ in 1:e₋_counts[e]] # root goes against direction of edge
-                ]
-            else # second edge fully explains connection
-                e = c[2] # looking at second edge of connection => flip switch logic
-                switches = [
-                    [dst(e) == v_shared for _ in 1:e₊_counts[e]]; # root follows direction of edge
-                    [dst(e) != v_shared for _ in 1:e₋_counts[e]] # root goes against direction of edge
-                ]
-            end
+        for i in 1:c₊_counts[c] # connection goes from edge 1 to 2
+            add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+        end
 
-            for switch in switches
-                add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = switch)
-            end
-
-        elseif (e₊_counts[c[1]] ∈ [0, e_counts[c[1]]]) || (e₊_counts[c[2]] ∈ [0, e_counts[c[2]]]) # connection can only go in one direction
-            
-            # first edge limiting
-            e = c[1]
-            if e_counts[e] == e₊_counts[e] # all following direction of edge
-                switches = [dst(e) != v_shared for _ in 1:c_counts[c]]
-            elseif e_counts[e] == e₋_counts[e] # all against direction of edge
-                switches = [dst(e) == v_shared for _ in 1:c_counts[c]]
-            end
-
-            # second edge limiting
-            e = c[2]
-            if e_counts[e] == e₊_counts[e] # all following direction of edge
-                switches = [dst(e) == v_shared for _ in 1:c_counts[c]]
-            elseif e_counts[e] == e₋_counts[e] # all against direction of edge
-                switches = [dst(e) != v_shared for _ in 1:c_counts[c]]
-            end
-
-            for switch in switches
-                add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = switch)
-            end
-
-        else # neither edge fully explains connection
-
-            @warn "OHHHH NOOOOOOOOOOOOOO"
-            for i in 1:c_counts[c]
-                push!(fragments, UndirectedRootFragment(is_primary, UndirectedRootEdge.(c)))
-            end
-
+        for i in 1:(c_counts[c]-c₊_counts[c]) # connection goes from edge 2 to 1
+            add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
         end
     end
 
@@ -100,20 +44,22 @@ function fragment(rg::RootGraph{T, U}, is_primary::Bool,
 end
 
 shared_vertex(c::Vector{<:AbstractEdge}) = vertices(c[1])[findfirst(v -> in(v, vertices(c[2])), vertices(c[1]))]
-function add_directed_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool, c::Vector{<:RootEdge}, v_shared; switch_edges::Bool)
+function add_directed_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool,
+        c::Vector{<:RootEdge}, v_shared; switch_edges::Bool
+    )
     if !switch_edges
-        push!(fragments, DirectedRootFragment(
+        push!(fragments, RootFragment(
             is_primary, 
             [
-                DirectedRootEdge(c[1], keep_order = (dst(c[1]) == v_shared)),
-                DirectedRootEdge(c[2], keep_order = (src(c[2]) == v_shared))
+                RootArc(c[1], keep_order = (dst(c[1]) == v_shared)),
+                RootArc(c[2], keep_order = (src(c[2]) == v_shared))
             ])
         )
     else
-        push!(fragments, DirectedRootFragment(is_primary,
+        push!(fragments, RootFragment(is_primary,
             [
-                DirectedRootEdge(c[2], keep_order = (dst(c[2]) == v_shared)),
-                DirectedRootEdge(c[1], keep_order = (src(c[1]) == v_shared))
+                RootArc(c[2], keep_order = (dst(c[2]) == v_shared)),
+                RootArc(c[1], keep_order = (src(c[1]) == v_shared))
             ])
         )
     end
@@ -155,40 +101,14 @@ are_options_unambiguous(xs) = (
         (length(xs) > 1 && allequal(xs)) # all options are equal
 )
 
-connects_to_end(f1::DirectedRootFragment, f2::DirectedRootFragment) = edges(f1)[end] == edges(f2)[1]
-connects_to_start(f1::DirectedRootFragment, f2::DirectedRootFragment) = edges(f1)[1] == edges(f2)[end]
+connects_to_end(f1::RootFragment, f2::RootFragment) = edges(f1)[end] == edges(f2)[1]
+connects_to_start(f1::RootFragment, f2::RootFragment) = edges(f1)[1] == edges(f2)[end]
 
-stitch_to_end!(f1::DirectedRootFragment, f2::DirectedRootFragment) = append!(f1.edges, f2.edges[2:end])
-stitch_to_start!(f1::DirectedRootFragment, f2::DirectedRootFragment) = prepend!(f1.edges, f2.edges[1:end-1])
+stitch_to_end!(f1::RootFragment, f2::RootFragment) = append!(f1.edges, f2.edges[2:end])
+stitch_to_start!(f1::RootFragment, f2::RootFragment) = prepend!(f1.edges, f2.edges[1:end-1])
 
-connects_to_end(f1::DirectedRootFragment, f2::UndirectedRootFragment) = edges(f1)[end] ∈ edges(f2)[[1, end]]
-connects_to_end(f1::UndirectedRootFragment, f2::DirectedRootFragment) = edges(f2)[1] ∈ edges(f1)[[1, end]]
-connects_to_end(f1::UndirectedRootFragment, f2::UndirectedRootFragment) = isdisjoint(edges(f1)[[1, end]], edges(f2)[[1, end]])
-
-connects_to_start(f1::DirectedRootFragment, f2::UndirectedRootFragment) = edges(f1)[1] ∈ edges(f2)[[1, end]]
-connects_to_start(f1::UndirectedRootFragment, f2::DirectedRootFragment) = edges(f2)[end] ∈ edges(f1)[[1, end]]
-connects_to_start(f1::UndirectedRootFragment, f2::UndirectedRootFragment) = isdisjoint(edges(f1)[[1, end]], edges(f2)[[1, end]])
-
-function stitch_to_end!(f1::DirectedRootFragment, f2::UndirectedRootFragment)
-    append!(f1.edges, get_directed(edges(f2), edges(f1)[end])[2:end])
-end
-
-function get_directed(ures::Vector{UndirectedRootEdge{T}}, dre::DirectedRootEdge{T}) where {T}
-    dres_new = Vector{DirectedRootEdge{T}}(undef, length(ures))
-    dres_new[1] = dre
-    
-    dre == ures[end] && reverse!(ures)
-    for i in 2:length(dres_new)
-        dres_new[i] = DirectedRootEdge(ures[i], keep_order = dst(dres_new[i-1]) == shared_vertex(ures[[i-1, i]]))
-    end
-
-    return dres_new
-end
-
-
-
-function get_roots(fs::Vector{<:RootFragment})
-    roots = Root[]
+function get_roots(fs::Vector{RootFragment{T}}) where {T}
+    roots = Union{SimpleRoot{T}, CompositeRoot{T}}[]
     # roots consisting of a single root fragment
     complete_fragments = filter(is_fullgrown, fs)
     append!(roots, Root[SimpleRoot(is_primary(f), f) for f in complete_fragments])
@@ -248,18 +168,14 @@ function separate_root_systems(rg::RootGraph, primary_roots::Vector{<:Root}, lat
         end
     end
 
-    return [
+    rootsystems = [
         RootSystem(primary_root, filter(r -> lateral_match_dict[r] == i, lateral_roots)) 
         for (i, primary_root) in enumerate(primary_roots)
     ]
-end
 
-function sort_root_system!(rs::Vector{<:Root})
-    sort!(rs, by = is_primary, rev = true)
-    if length(rs) > 1
-        @assert !is_primary(rs[2]) "Root systems should only contain one primary root"
-        sort!(@view(rs[2:end]), by = curve_length, rev = true)
+    for rs in rootsystems
+        sort!(laterals(rs), by = r -> curve_length(rg, r), rev = true)
     end
-
-    return nothing
+    
+    return rootsystems
 end

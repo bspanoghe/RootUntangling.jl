@@ -39,6 +39,17 @@ segment_id(re::RootEdge) = re.segment_id
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
 
+# Like a RootEdge but then directed! (used in root construction)
+struct RootArc{T} <: AbstractEdge
+    src::T
+    dst::T
+    segment_id::T
+end
+RootArc(re::RootEdge; keep_order::Bool) = (
+    keep_order ? RootArc(src(re), dst(re), segment_id(re)) : 
+        RootArc(dst(re), src(re), segment_id(re))
+)
+
 # vertices
 """
     RootVertex{T, U}
