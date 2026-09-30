@@ -10,10 +10,10 @@ ENV["JULIA_DEBUG"] = RootUntangling
 # choose boy
 
 playground_dir = "playground"
-difficulty = "ungodly"
+difficulty = "tough"
 validation_dir = "validation/$(difficulty)"
 
-directory = validation_dir
+directory = playground_dir
 roi_nr = 1
 
 # read data
@@ -52,27 +52,14 @@ begin
     f_multi
 end
 
-annotating = false
-if annotating
-    root_systems = get_root_systems(rgs, ones(Int64, length(rgs)), optimizer = Gurobi.Optimizer,
-        time_limit = 13*60, hotstart_time = 2*60, ρₒ_base = 4.0
-    )
-
-    f_ann = annotation_plot(rg_full, root_systems, size = (3200, 1800))
-    save("results/$(directory)/ROI_$(roi_nr).svg", f_ann)
-    write_annotation("results/$(directory)/ROI_$(roi_nr).txt", rg_full, rgs, root_systems)
-end
-
-# f_ann = annotation_plot(rg_full, root_systems, size = (1600, 900))
-
 subidx = 1
 rg = rgs[subidx]
 graphplot(rg)
 
 begin
     model, time = @timed solve_rsa(
-        rg; optimizer = Gurobi.Optimizer, time_limit = 60,
-        num_roots = 10
+        rg; optimizer = HiGHS.Optimizer, time_limit = 15*60,
+        num_roots = 1, max_roots = 5
     )
 
     annotate_that_thang = false
@@ -89,23 +76,18 @@ begin
         annotation_coords = [(x(rv), y(rv)) for rv in V₀(rg)]
         annotation_texts = string.(id.(V₀(rg)))
         annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :green, shrink = (0, 0), fontsize = 8)
+        save(homedir() * "/Downloads/oooo_the_mimeryyy.svg", f_g)
+
     else
-        f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (500, 200), vertex_kwargs = Dict(:markersize => 2))
+       f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (200, 500), vertex_kwargs = Dict(:markersize => 2))
+       f_g
     end
-
-    f_g
 end
+rss = get_rootsystems(rg, model);
+rss_new = greedy_switch(rg, rss, f_obj = weighted_tortuosity);
 
-# save(homedir() * "/Downloads/wwawa.svg", f_g)
-
-roots = get_rootsystems(rg, model);
-rootplot(rg, roots)
-
-# roots_new = greedy_switch(rg, model, roots)
-
-
-r1 = rootplot(roots, size = (600, 600), title = "Time: $(round(time / 60, digits = 1)) min")
-r2 = rootplot(roots_new, size = (600, 600), title = "Time: $(round(time / 60, digits = 1)) min")
+r1 = rootplot(rg, rss, size = (600, 600), title = "Weighted tortuosity: $(weighted_tortuosity(rg, rss))")
+r2 = rootplot(rg, rss_new, size = (600, 600), title = "Weighted tortuosity: $(weighted_tortuosity(rg, rss_new))")
 
 save(homedir() * "/Downloads/test1.svg", r1)
 save(homedir() * "/Downloads/test2.svg", r2)
@@ -117,66 +99,3 @@ lines(
     color = [fill(HSV(0, 1, pred_primary(re)), 3) for re in E₀(rgs[subidx])] |> x -> reduce(vcat, x)
 )
 savefig(homedir() * "\\Downloads\\wa.svg")
-
-# testing grounds
-
-points = Observable(Point2f[])
-
-scene = Scene(camera = campixel!)
-linesegments!(scene, points, color = :black)
-scatter!(scene, points, color = :gray)
-
-on(events(scene).mousebutton) do event
-    if event.button == Mouse.left
-        if event.action == Mouse.press || event.action == Mouse.release
-            mp = events(scene).mouseposition[]
-            push!(points[], mp)
-            notify(points)
-        end
-    end
-end
-
-scene
-
-working_on = 1
-
-begin
-    f = RootUntangling.annotation_plot(rg, annotation_dict)
-    ax = Axis(f[1, 1])
-    hidedecorations!(ax, label = false, ticks = false, ticklabels = false)
-    hidespines!(ax, :t, :r)
-
-    i = Observable((0.0,0.0))
-    str = lift(i -> "$(i)", i)
-    text!(ax, 1, -0.5, text = str,  align = (:center, :center))
-    on(events(f).mousebutton, priority = 2) do event
-        if event.button == Mouse.left && event.action == Mouse.press
-            global elements = Makie.pick_sorted(f.scene, events(f).mouseposition[], 30)
-            filter!(x -> x[1] isa Lines, elements)
-            line_idx = findfirst(x -> x[1] isa Lines, elements)
-            if !isnothing(line_idx)
-                line_element = elements[line_idx]
-                re_picked = line_element[1].arg2.value[]
-
-                current_annotation_idx = findfirst(x -> x == working_on, annotation_dict[re_picked])
-                if isnothing(current_annotation_idx)
-                    push!(annotation_dict[re_picked], working_on)
-                else
-                    deleteat!(annotation_dict[re_picked], current_annotation_idx)
-                end
-
-                f = RootUntangling.annotation_plot(rg, annotation_dict)
-            end
-        end
-    end
-    f
-end
-
-f = RootUntangling.annotation_plot(rg, annotation_dict)
-DataInspector(f)
-f
-
-
-
-
-###########################################################################################################
