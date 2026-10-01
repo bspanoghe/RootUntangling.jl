@@ -21,7 +21,7 @@ edge_data_dict = Dict(
 
 pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
 rg = get_rootgraph(pg);
-model = solve_rsa(rg; optimizer = HiGHS.Optimizer, num_roots = 3, max_roots = 4, ρₒ = 0.3);
+model = solve_rsa(rg; optimizer = JuMP.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false), num_roots = 3, max_overlapping = 4, ρₒ = 0.3);
 
 # edges correct?
 appearance_idxs = src.(E(rg)) .== -1;
