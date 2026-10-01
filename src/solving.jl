@@ -22,12 +22,10 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 - `ϵ`: The strength of the bound preventing probabilities from reaching 0 or 1 for numerical stability.
 """
 function solve_rsa(
-        rg::RootGraph; optimizer, time_limit = missing, max_roots = 3,
+        rg::RootGraph; optimizer, time_limit = missing, max_overlapping = 3,
         num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₒ = 0.1, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5,
-        w_gp = 1.0, w_gl = 1.0, ρₒ_base = exp(1),  α_down = -pi / 2, ϵ = 1e-3
+        w_gp = 1.0, w_gl = 1.0, α_down = -pi / 2, ϵ = 1e-3
     )
-
-    @assert ρₒ_base >= 1 "The base for the overlap probability must be greater or equal than 1."
 
     # check for NN prediction data #! remove for final version
     NN_pred = pred_primary(E₀(rg)[1]) |> !ismissing
@@ -48,15 +46,15 @@ function solve_rsa(
 
     @variable(model, ea[1:n_e], Bin) # does edge contain roots
     @variable(model, epa[1:n_e], Bin) # does edge contain primary roots
-    @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of primary roots in edge
-    @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of roots in edge following positive direction
-    @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of lateral roots in edge
-    @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = max_roots) # number of roots in edge following positive direction
+    @variable(model, ep[1:n_e], Int, lower_bound = 0, upper_bound = max_overlapping) # number of primary roots in edge
+    @variable(model, ep₊[1:n_e], Int, lower_bound = 0, upper_bound = max_overlapping) # number of roots in edge following positive direction
+    @variable(model, el[1:n_e], Int, lower_bound = 0, upper_bound = max_overlapping) # number of lateral roots in edge
+    @variable(model, el₊[1:n_e], Int, lower_bound = 0, upper_bound = max_overlapping) # number of roots in edge following positive direction
 
-    @variable(model, cp[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in primary connection
-    @variable(model, cp₊[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in primary connection
-    @variable(model, cl[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in lateral connection
-    @variable(model, cl₊[1:n_c], Int, lower_bound = 0, upper_bound = max_roots) # number of edges in lateral connection
+    @variable(model, cp[1:n_c], Int, lower_bound = 0, upper_bound = max_overlapping) # number of edges in primary connection
+    @variable(model, cp₊[1:n_c], Int, lower_bound = 0, upper_bound = max_overlapping) # number of edges in primary connection
+    @variable(model, cl[1:n_c], Int, lower_bound = 0, upper_bound = max_overlapping) # number of edges in lateral connection
+    @variable(model, cl₊[1:n_c], Int, lower_bound = 0, upper_bound = max_overlapping) # number of edges in lateral connection
 
     # connect model variables to graph's edges
     ea2f = Dict([E(rg)[i] => ea[i] for i in eachindex(E(rg))])
