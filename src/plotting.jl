@@ -80,7 +80,7 @@ function add_annotation!(ax::Makie.Axis, rg::RootGraph, res::Vector{<:RootEdge};
     return nothing
 end
 
-function annotation_plot(sg::SuperGraph; size = (600, 400), fontsize = 4, edge_kwargs::Dict = Dict(), kwargs...)
+function annotation_plot(rg::RootGraph; size = (600, 400), fontsize = 4, edge_kwargs::Dict = Dict(), kwargs...)
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
 
