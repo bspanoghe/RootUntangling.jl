@@ -21,33 +21,33 @@ edge_data_dict = Dict(
 
 pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
 rg = get_rootgraph(pg);
-model = solve_rsa(rg; optimizer = HiGHS.Optimizer, num_roots = 3, max_roots = 4, ρₒ = 0.3);
+model = solve_rsa(rg; optimizer = JuMP.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false), num_roots = 3, max_overlapping = 4, ρₒ = 0.3);
 
 # edges correct?
 appearance_idxs = src.(E(rg)) .== -1;
-@test round(sum(value.(model[:ep])[appearance_idxs])) == 3
 @test round(sum(value.(model[:ep₊])[appearance_idxs])) == 3
+@test round(sum(value.(model[:ep₋])[appearance_idxs])) == 0
 
 disappearance_idxs = src.(E(rg)) .== -2;
-@test round(sum(value.(model[:ep])[disappearance_idxs])) == 3
 @test round(sum(value.(model[:ep₊])[disappearance_idxs])) == 0
+@test round(sum(value.(model[:ep₋])[disappearance_idxs])) == 3
 
 division_idxs = src.(E(rg)) .== -3;
-@test round(sum(value.(model[:ep])[division_idxs])) == 0
 @test round(sum(value.(model[:ep₊])[division_idxs])) == 0
+@test round(sum(value.(model[:ep₋])[division_idxs])) == 0
 
 # connections correct?
 appearance_idxs = in.([-1], vertices.(first.(E₂(rg))));
-@test round(sum(value.(model[:cp])[appearance_idxs])) == 3
 @test round(sum(value.(model[:cp₊])[appearance_idxs])) == 3
+@test round(sum(value.(model[:cp₋])[appearance_idxs])) == 0
 
 disappearance_idxs = in.([-2], vertices.(first.(E₂(rg))));
-@test round(sum(value.(model[:cp])[disappearance_idxs])) == 3
 @test round(sum(value.(model[:cp₊])[disappearance_idxs])) == 0
+@test round(sum(value.(model[:cp₋])[disappearance_idxs])) == 3
 
 division_idxs = in.([-3], vertices.(first.(E₂(rg))));
-@test round(sum(value.(model[:cp])[division_idxs])) == 0
 @test round(sum(value.(model[:cp₊])[division_idxs])) == 0
+@test round(sum(value.(model[:cp₋])[division_idxs])) == 0
 
 # roots
 rootsystems = get_rootsystems(rg, model);

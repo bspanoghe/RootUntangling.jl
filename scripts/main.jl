@@ -56,33 +56,13 @@ subidx = 1
 rg = rgs[subidx]
 graphplot(rg)
 
-begin
-    model, time = @timed solve_rsa(
-        rg; optimizer = HiGHS.Optimizer, time_limit = 15*60,
-        num_roots = 1, max_roots = 5
-    )
+model, time = @timed solve_rsa(
+    rg; optimizer = HiGHS.Optimizer, time_limit = 3*60,
+    num_roots = 1, max_overlapping = 5
+)
 
-    annotate_that_thang = false
-    if annotate_that_thang
-        f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1000, 2000))
-        rd = get_result_dict(rg, model)
-        annotation_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in E₀(rg)]
-        annotation_texts = [
-            "($(rd[re][:e₊]) / $(rd[re][:e₋]))"
-            for re in E₀(rg)
-        ]
-        annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :red, shrink = (0, 0), fontsize = 8)
+f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (200, 500), vertex_kwargs = Dict(:markersize => 2))
 
-        annotation_coords = [(x(rv), y(rv)) for rv in V₀(rg)]
-        annotation_texts = string.(id.(V₀(rg)))
-        annotation!(f_g.content[1], annotation_coords; text = annotation_texts, color = :green, shrink = (0, 0), fontsize = 8)
-        save(homedir() * "/Downloads/oooo_the_mimeryyy.svg", f_g)
-
-    else
-       f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (200, 500), vertex_kwargs = Dict(:markersize => 2))
-       f_g
-    end
-end
 rss = get_rootsystems(rg, model);
 rss_new = greedy_switch(rg, rss, f_obj = weighted_tortuosity);
 
