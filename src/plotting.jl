@@ -48,8 +48,8 @@ function graphplot(
         augmented_alpha = 0.1, size = (600, 600), vertex_kwargs = Dict([]), edge_kwargs = Dict([]), kwargs...
     )
 
-    eps = round.(Int64, value.(model[:ep]))
-    els = round.(Int64, value.(model[:el]))
+    eps = round.(Int64, value.(model[:ep₊])) + round.(Int64, value.(model[:ep₋]))
+    els = round.(Int64, value.(model[:el₊])) + round.(Int64, value.(model[:el₋]))
 
     classification_edge_kwargs = Dict(
         :color => [
@@ -101,7 +101,7 @@ function annotation_plot(rg::RootGraph, model::JuMP.Model;
     f_g = graphplot(rg, model; standard_alpha, augmented_alpha, size, vertex_kwargs, edge_kwargs, kwargs...)
 
     e₊s = round.(Int64, value.(model[:ep₊])) + round.(Int64, value.(model[:el₊]))
-    e₋s = round.(Int64, value.(model[:ep])) + round.(Int64, value.(model[:el])) - e₊s
+    e₋s = round.(Int64, value.(model[:ep₋])) + round.(Int64, value.(model[:el₋]))
 
     segment_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in E₀(rg)]
     segment_texts = [

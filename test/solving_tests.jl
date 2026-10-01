@@ -25,29 +25,29 @@ model = solve_rsa(rg; optimizer = HiGHS.Optimizer, num_roots = 3, max_roots = 4,
 
 # edges correct?
 appearance_idxs = src.(E(rg)) .== -1;
-@test round(sum(value.(model[:ep])[appearance_idxs])) == 3
 @test round(sum(value.(model[:ep₊])[appearance_idxs])) == 3
+@test round(sum(value.(model[:ep₋])[appearance_idxs])) == 0
 
 disappearance_idxs = src.(E(rg)) .== -2;
-@test round(sum(value.(model[:ep])[disappearance_idxs])) == 3
 @test round(sum(value.(model[:ep₊])[disappearance_idxs])) == 0
+@test round(sum(value.(model[:ep₋])[disappearance_idxs])) == 3
 
 division_idxs = src.(E(rg)) .== -3;
-@test round(sum(value.(model[:ep])[division_idxs])) == 0
 @test round(sum(value.(model[:ep₊])[division_idxs])) == 0
+@test round(sum(value.(model[:ep₋])[division_idxs])) == 0
 
 # connections correct?
 appearance_idxs = in.([-1], vertices.(first.(E₂(rg))));
-@test round(sum(value.(model[:cp])[appearance_idxs])) == 3
 @test round(sum(value.(model[:cp₊])[appearance_idxs])) == 3
+@test round(sum(value.(model[:cp₋])[appearance_idxs])) == 0
 
 disappearance_idxs = in.([-2], vertices.(first.(E₂(rg))));
-@test round(sum(value.(model[:cp])[disappearance_idxs])) == 3
 @test round(sum(value.(model[:cp₊])[disappearance_idxs])) == 0
+@test round(sum(value.(model[:cp₋])[disappearance_idxs])) == 3
 
 division_idxs = in.([-3], vertices.(first.(E₂(rg))));
-@test round(sum(value.(model[:cp])[division_idxs])) == 0
 @test round(sum(value.(model[:cp₊])[division_idxs])) == 0
+@test round(sum(value.(model[:cp₋])[division_idxs])) == 0
 
 # roots
 rootsystems = get_rootsystems(rg, model);

@@ -6,7 +6,7 @@ Extract the rootsystems from a graph `rg` and its solution contained in `model`.
 function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
     
     # get primary roots
-    c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp])))
+    c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp₊])) + round.(Int64, value.(model[:cp₋])))
     c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp₊])))
 
     primary_fragments = fragment(rg, true, c_counts, c₊_counts)
@@ -14,7 +14,7 @@ function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
     primary_roots = get_roots(primary_fragments)
 
     # get lateral roots
-    c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl])))
+    c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl₊])) + round.(Int64, value.(model[:cl₋])))
     c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl₊])))
 
     lateral_fragments = fragment(rg, false, c_counts, c₊_counts)
