@@ -90,25 +90,25 @@ function solve_rsa(
         ) +
         # primary gravitropy (needs to be split up into two sums to remain a linear objective)
         w_gp * sum(
-            ep₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            ep₊2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
         w_gp * sum(
-            ep₋2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            ep₋2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # lateral gravitropy (needs to be split up into two sums to remain a linear objective)
         w_gl * sum(
-            el₊2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+            el₊2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
         w_gl * sum(
-            el₋2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+            el₋2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # angle differences
         sum(
-            (cp₊2f[c] + cp₋2f[c] + cl₊2f[c] + cl₋2f[c]) * log(ρₘ(rg, v, c; ρₘ_max, ϵ) / (1 - ρₘ(rg, v, c; ρₘ_max, ϵ)))
+            (cp₊2f[c] + cp₋2f[c] + cl₊2f[c] + cl₋2f[c]) * log(ρₘ(v, c; ρₘ_max, ϵ) / (1 - ρₘ(v, c; ρₘ_max, ϵ)))
             for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
         )
     )
@@ -217,12 +217,12 @@ end
 bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
 
 # change in angle probability
-ρₘ(rg, v, c; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(rg, c..., id(v)) |> p -> bound(p; ϵ)
+ρₘ(v::RootVertex, c::Vector{<:RootEdge}; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(c..., id(v)) |> p -> bound(p; ϵ)
 
 # gravitropic growth probability
-ρᵧ(rg, e, α_down, reverse_order; ρᵧ_max, ϵ) = (
-    ρᵧ_max * (1 + cosine_similarity(rg, e, α_down; reverse_order)) / 2
+ρᵧ(rg::RootGraph, e::RootEdge, α_down::Real, correct_order::Bool; ρᵧ_max, ϵ) = (
+    ρᵧ_max * (1 + cosine_similarity(rg, e, α_down, correct_order)) / 2
 ) |> p -> bound(p; ϵ)
 
 # NN pred primary probability
-ρₙₙ(re; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p; ϵ)
+ρₙₙ(re::RootEdge; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p; ϵ)
