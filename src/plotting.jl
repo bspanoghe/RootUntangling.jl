@@ -74,20 +74,35 @@ end
 
 # ### With annotation classification
 function annotation_plot(rg::RootGraph; size = (500, 1000), fontsize = 8, e_color = :red,
-        edge_kwargs::Dict = Dict(), kwargs...
+        v_color = :green, arrow_scaling::Real = 20, edge_kwargs::Dict = Dict(), kwargs...
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
 
-    color(re) = ismissing(pred_primary(re)) ? HSV(0, 1, 0) : HSV(200, 1, pred_primary(re))
+    color(re) = ismissing(pred_primary(re)) ? HSV(0, 1, 0) : HSV(0, 1, pred_primary(re))
 
     for re in E₀(rg)
         lines!(ax, rg, re; color = color(re), edge_kwargs...)
     end
 
+    arrows2d!(ax,
+        first.(xs.([rg], E₀(rg))), first.(ys.([rg], E₀(rg))), 
+        cos.(src_angle.(E₀(rg))), sin.(src_angle.(E₀(rg))),
+        lengthscale = arrow_scaling, color = :orange, shaftwidth = 2, tipwidth = 5, tiplength = 5
+    )
+    arrows2d!(ax,
+        last.(xs.([rg], E₀(rg))), last.(ys.([rg], E₀(rg))),
+        cos.(dst_angle.(E₀(rg))), sin.(dst_angle.(E₀(rg))),
+        lengthscale = arrow_scaling, color = :cyan, shaftwidth = 2, tipwidth = 5, tiplength = 5
+    )
+
     annotation_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in E₀(rg)]
     annotation_texts = [string(segment_id(re)) for re in E₀(rg)]
     annotation!(ax, annotation_coords; text = annotation_texts, shrink = (0, 0), color = e_color, fontsize)
+
+    vertex_coords = [(x(rv), y(rv)) for rv in V₀(rg)]
+    vertex_texts = string.(id.(V₀(rg)))
+    annotation!(ax, vertex_coords; text = vertex_texts, color = v_color, shrink = (0, 0), fontsize)
 
     return f
 end
@@ -114,6 +129,7 @@ function annotation_plot(rg::RootGraph, model::JuMP.Model;
     vertex_coords = [(x(rv), y(rv)) for rv in V₀(rg)]
     vertex_texts = string.(id.(V₀(rg)))
     annotation!(f_g.content[1], vertex_coords; text = vertex_texts, color = v_color, shrink = (0, 0), fontsize)
+
     return f_g
 end
 
