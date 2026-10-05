@@ -26,17 +26,17 @@ For the file containing edge/segment information.
 """
 function get_rootgraph(
         filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, reverse_y::Bool,
+        dist_threshold::Real, reverse_y::Bool, angle_correction::Function = identity,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
         x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
         segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
-        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords
+        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords, angles_colname = :BP_Angles
     )
 
     pg = get_pregraph(
-        filename_segments, filename_vertices; dist_threshold, reverse_y, node_id_colname,
-        segment_ids_colname, x_colname, y_colname, lateral_score_colname, segment_id_colname,
-        dist_colname, primary_score_colname, coords_colname
+        filename_segments, filename_vertices; dist_threshold, reverse_y, angle_correction,
+        node_id_colname, segment_ids_colname, x_colname, y_colname, lateral_score_colname, 
+        segment_id_colname, dist_colname, primary_score_colname, coords_colname, angles_colname
     )
     rg = get_rootgraph(pg)
 

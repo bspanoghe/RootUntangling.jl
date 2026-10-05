@@ -9,15 +9,17 @@ mutable struct Segment{T, U}
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove later
     xs::Vector{<:Number}
     ys::Vector{<:Number}
+    angles::Vector{U}
 end
 
-Segment(id, vertices) = Segment(id, vertices, NaN, NaN, Number[], Number[])
+Segment(id, vertices) = Segment(id, vertices, NaN, NaN, Number[], Number[], [NaN, NaN])
 id(s::Segment) = s.id
 vertices(s::Segment) = s.vertices
 width(s::Segment) = s.width
 pred_primary(s::Segment) = s.pred_primary
 xs(s::Segment) = s.xs
 ys(s::Segment) = s.ys
+angles(s::Segment) = s.angles
 
 isspecial(s::Segment) = any(isspecial(v) for v in vertices(s))
 
@@ -45,6 +47,8 @@ isspecial(mv::MetaVertex) = id(mv) < 0
 coords(mv::MetaVertex) = [x(mv), y(mv)]
 distance(mv1::MetaVertex, mv2::MetaVertex) = (coords(mv1) - coords(mv2)) .^ 2 |> sum |> sqrt
 
+angle(x1::Real, y1::Real, x2::Real, y2::Real) = atan(y2 - y1, x2 - x1)
+angle(mv1::MetaVertex, mv2::MetaVertex) = angle(x(mv1), y(mv1), x(mv2), y(mv2))
 
 struct PreGraph{T, U, V}
     vertices::Vector{T}

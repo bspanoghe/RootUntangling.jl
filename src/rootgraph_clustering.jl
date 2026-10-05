@@ -47,7 +47,10 @@ end
 function recreate_V₀(rv::RootVertex{T, U}, id_conversion_dict::Dict) where {T, U}
     id_new = id_conversion_dict[id(rv)]
     res_new = RootEdge{T, U}[
-        RootEdge([id_conversion_dict[v] for v in vertices(re)]..., segment_id(re), width(re), pred_primary(re))
+        RootEdge(
+            [id_conversion_dict[v] for v in vertices(re)]...,
+            [f(re) for f in [segment_id, width, pred_primary, src_angle, dst_angle]]...
+        )
         for re in E(rv) if all(haskey.([id_conversion_dict], vertices(re)))
     ]
 
@@ -59,7 +62,10 @@ end
 function recreate_V₊(rv::RootVertex{T, U}, id_conversion_dict::Dict, recreated_V₀::Vector{RootVertex{T, U}}; augmented_margins) where {T, U}
     id_new = id_conversion_dict[id(rv)]
     res_new = RootEdge{T, U}[
-        RootEdge([id_conversion_dict[v] for v in vertices(re)]..., segment_id(re), width(re), pred_primary(re))
+        RootEdge(
+            [id_conversion_dict[v] for v in vertices(re)]..., 
+            [f(re) for f in [segment_id, width, pred_primary, src_angle, dst_angle]]...
+        )
         for re in E(rv) if all(haskey.([id_conversion_dict], vertices(re)))
     ]
     coords_new = get_augmented_coords(id(rv), recreated_V₀; augmented_margins)

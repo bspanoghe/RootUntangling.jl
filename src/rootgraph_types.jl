@@ -27,17 +27,30 @@ struct RootEdge{T, U} <: AbstractEdge
     segment_id::T
     width::U
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove Missing Union later
+    src_angle::U
+    dst_angle::U
 
-    RootEdge(src::T, dst::T, segment_id::T, width::U, pred_primary::Union{U, Missing}) where {T, U} = (
-        new{T, U}(sort([src, dst])..., segment_id, width, pred_primary)
-    )
+    function RootEdge(src::T, dst::T, segment_id::T, width::U,
+            pred_primary::Union{U, Missing}, src_angle::U, dst_angle::U) where {T, U}
+        
+        p = sortperm([src, dst])
+        new{T, U}([src, dst][p]..., segment_id, width, pred_primary, [src_angle, dst_angle][p]...)
+    end
 end
-RootEdge(src::T, dst::T) where {T} = RootEdge(src, dst, 0, NaN, NaN)
-RootEdge(s::Segment) = RootEdge(vertices(s)..., id(s), width(s), pred_primary(s))
+RootEdge(src::T, dst::T) where {T} = RootEdge(src, dst, 0, NaN, NaN, NaN, NaN)
+function RootEdge(s::Segment)
+    p = sortperm(vertices(s)) # permutation vector that sorts indices
+    src, dst = vertices(s)[p]
+    src_angle, dst_angle = angles(s)[p]
+
+    return RootEdge(src, dst, id(s), width(s), pred_primary(s), src_angle, dst_angle)
+end
 
 segment_id(re::RootEdge) = re.segment_id
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
+src_angle(re::RootEdge) = re.src_angle
+dst_angle(re::RootEdge) = re.dst_angle
 
 # Like a RootEdge but then directed! (used in root construction)
 struct RootArc{T} <: AbstractEdge
@@ -67,7 +80,6 @@ struct RootVertex{T, U}
         new{T, U}(id, sort(edges, by = e -> src(e)), x, y, pred_split)
     )
 end
-RootVertex(id, edges, x, y, pred_split) = RootVertex(id, edges, x, y, pred_split)
 
 id(rv::RootVertex) = rv.id
 edges(rv::RootVertex) = rv.edges

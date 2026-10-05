@@ -8,13 +8,12 @@ using Dates, Statistics
 ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
-
 playground_dir = "playground"
-difficulty = "tough"
+difficulty = "ungodly"
 validation_dir = "validation/$(difficulty)"
 
-directory = playground_dir
-roi_nr = 1
+directory = validation_dir
+roi_nr = 2
 
 # read data
 
@@ -23,21 +22,23 @@ begin
 
     dist_threshold = 3
     reverse_y = true
+    angle_correction = -
 
     filename_segments = "./data/$(directory)/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "./data/$(directory)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    rg_full = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y)
+    rg_full = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y, angle_correction)
 
     graphplot(rg_full, augmented_alpha = 0.01)
 end
 
 begin
-    min_vertices = 10
-    y_threshold = -1000
+    min_vertices = 15
+    y_min = -1000
+    y_max = 10000
 
     rgs = get_subgraphs(rg_full) |>
         rgs -> filter(rg -> length(rg) > min_vertices, rgs) |>
-        rgs -> filter(rg -> minimum(y.(V₀(rg))) > y_threshold, rgs) |>
+        rgs -> filter(rg -> minimum(y.(V₀(rg))) >= y_min && maximum(y.(V₀(rg))) <= y_max, rgs) |>
         rgs -> sort(rgs, by = rg -> mean(x.(V₀(rg))));
 
     f_multi = Figure()
@@ -54,14 +55,14 @@ end
 
 subidx = 1
 rg = rgs[subidx]
-graphplot(rg)
+graphplot(rg, augmented_alpha = 0.01)
 
 model, time = @timed solve_rsa(
     rg; optimizer = HiGHS.Optimizer, time_limit = 3*60,
-    num_roots = 1, max_overlapping = 5
+    num_roots = 3, max_overlapping = 5, ρₘ_max = 0.9
 )
 
-f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (200, 500), vertex_kwargs = Dict(:markersize => 2))
+f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (500, 500), vertex_kwargs = Dict(:markersize => 2))
 
 rss = get_rootsystems(rg, model);
 rss_new = greedy_switch(rg, rss, f_obj = weighted_tortuosity);
