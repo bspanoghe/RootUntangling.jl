@@ -23,8 +23,8 @@ The problem is formulated as a Integer Quadratic Program (IQP) written to allow 
 """
 function solve_rsa(
         rg::RootGraph; optimizer, time_limit = missing, max_overlapping = 3,
-        num_roots::Integer = 1, ρₐ = 0.01, ρₕ = 0.97, ρₒ = 0.1, ρₘ_max = 0.75, ρₙₙ_max = 0.9, ρᵧ_max = 0.5,
-        w_gp = 1.0, w_gl = 1.0, α_down = -pi / 2, ϵ = 1e-3
+        num_roots::Integer = 1, ρₐ = 0.01, ρₛ = 0.1, ρₕ = 0.99, ρₒ = 0.2, ρₙₙ_max = 0.9, 
+        ρₘ_max = 0.6, ρₘ_min = 0.1, ρᵧ_max = 0.5, ρᵧ_min = 0.1, α_down = -pi / 2, ϵ = 1e-3
     )
 
     # check for NN prediction data #! remove for final version
@@ -78,6 +78,10 @@ function solve_rsa(
             (ep₊2f[e] + ep₋2f[e] + el₊2f[e] + el₋2f[e]) * log(ρₐ / (1 - ρₐ))
             for e in E(vₐ)
         ) +
+        sum(
+            (ep₊2f[e] + ep₋2f[e] + el₊2f[e] + el₋2f[e]) * log(ρₛ / (1 - ρₛ))
+            for e in E(vₛ)
+        ) +
         # standard rootedges should be active
         sum(
             ea2f[e] * log(ρₕ / (1 - ρₕ))
@@ -85,30 +89,30 @@ function solve_rsa(
         ) + 
         # overlap probability
         sum(
-            (ep₊2f[e] + ep₋2f[e] + el₊2f[e] + el₋2f[e]) * log(ρₒ / (1 - ρₒ)) #! -1?
+            ((ep₊2f[e] + ep₋2f[e] + el₊2f[e] + el₋2f[e]) - ea2f[e]) * log(ρₒ / (1 - ρₒ))
             for e in E₀(rg)
         ) +
         # primary gravitropy (needs to be split up into two sums to remain a linear objective)
-        w_gp * sum(
-            ep₊2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+        sum(
+            ep₊2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_min, ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_min, ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
-        w_gp * sum(
-            ep₋2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+        sum(
+            ep₋2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_min, ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_min, ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # lateral gravitropy (needs to be split up into two sums to remain a linear objective)
-        w_gl * sum(
-            el₊2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_max, ϵ)))
+        sum(
+            el₊2f[e] * log(ρᵧ(rg, e, α_down, true; ρᵧ_min, ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, true; ρᵧ_min, ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) +
-        w_gl * sum(
-            el₋2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_max, ϵ)))
+        sum(
+            el₋2f[e] * log(ρᵧ(rg, e, α_down, false; ρᵧ_min, ρᵧ_max, ϵ) / (1 - ρᵧ(rg, e, α_down, false; ρᵧ_min, ρᵧ_max, ϵ)))
             for e in E₀(rg)
         ) + 
         # angle differences
         sum(
-            (cp₊2f[c] + cp₋2f[c] + cl₊2f[c] + cl₋2f[c]) * log(ρₘ(v, c; ρₘ_max, ϵ) / (1 - ρₘ(v, c; ρₘ_max, ϵ)))
+            (cp₊2f[c] + cp₋2f[c] + cl₊2f[c] + cl₋2f[c]) * log(ρₘ(v, c; ρₘ_min, ρₘ_max, ϵ) / (1 - ρₘ(v, c; ρₘ_min, ρₘ_max, ϵ)))
             for v in V₀(rg) for c in E₂(v) if !any([is_augmented(e) for e in c])
         )
     )
@@ -157,7 +161,7 @@ function solve_rsa(
         @constraint(model, epa2f[e] <= ep₊2f[e] + ep₋2f[e])
     end
 
-    # ## Special vertices
+    # ### For special vertices:
 
     # The appearance vertex has no incoming edges (edges are either inactive or follow natural polarity)
     @constraint(model, sum(ep₋2f[e] for e in E(vₐ)) == 0)
@@ -182,7 +186,7 @@ function solve_rsa(
         @constraint(model, ep₊2f[e] == 0)
     end
 
-    # ## Extras
+    # ## Root numbers
 
     if !ismissing(num_roots)
         # The appearance vertex is connected to the primary root with one edge per root
@@ -214,15 +218,22 @@ end
 
 # # objective function probabilities
 # prevent probabilities from reaching 0 or 1
-bound(p; ϵ = 1.0e-9) = ϵ / 2 + (1 - ϵ) * p
+bound(p, ϵ) = ϵ / 2 + (1 - ϵ) * p
+bound(p, lb, ub) = lb + (ub - lb) * p
 
 # change in angle probability
-ρₘ(v::RootVertex, c::Vector{<:RootEdge}; ρₘ_max, ϵ) = ρₘ_max * angle_dissimilarity(c..., id(v)) |> p -> bound(p; ϵ)
+ρₘ(v::RootVertex, c::Vector{<:RootEdge}; ρₘ_min, ρₘ_max, ϵ) = (
+    angle_dissimilarity(c..., id(v)) |>
+    p -> bound(p, ρₘ_min, ρₘ_max) |>
+    p -> bound(p, ϵ)
+)
 
 # gravitropic growth probability
-ρᵧ(rg::RootGraph, e::RootEdge, α_down::Real, correct_order::Bool; ρᵧ_max, ϵ) = (
-    ρᵧ_max * (1 + cosine_similarity(rg, e, α_down, correct_order)) / 2
-) |> p -> bound(p; ϵ)
+ρᵧ(rg::RootGraph, e::RootEdge, α_down::Real, correct_order::Bool; ρᵧ_min, ρᵧ_max, ϵ) = (
+    (1 + cosine_similarity(rg, e, α_down, correct_order)) / 2 |>
+    p -> bound(p, ρᵧ_min, ρᵧ_max) |>
+    p -> bound(p, ϵ)
+)
 
 # NN pred primary probability
-ρₙₙ(re::RootEdge; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p; ϵ)
+ρₙₙ(re::RootEdge; ρₙₙ_max, ϵ) = ρₙₙ_max * pred_primary(re) |> p -> bound(p, ϵ)
