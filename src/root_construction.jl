@@ -32,11 +32,11 @@ function fragment(rg::RootGraph{T, U}, is_primary::Bool, c_counts::Dict, c₊_co
         v_shared = shared_vertex(c)
 
         for i in 1:c₊_counts[c] # connection goes from edge 1 to 2
-            add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+            add_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
         end
 
         for i in 1:(c_counts[c]-c₊_counts[c]) # connection goes from edge 2 to 1
-            add_directed_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+            add_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
         end
     end
 
@@ -44,7 +44,7 @@ function fragment(rg::RootGraph{T, U}, is_primary::Bool, c_counts::Dict, c₊_co
 end
 
 shared_vertex(c::Vector{<:AbstractEdge}) = vertices(c[1])[findfirst(v -> in(v, vertices(c[2])), vertices(c[1]))]
-function add_directed_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool,
+function add_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool,
         c::Vector{<:RootEdge}, v_shared; switch_edges::Bool
     )
     if !switch_edges
@@ -101,20 +101,20 @@ are_options_unambiguous(xs) = (
         (length(xs) > 1 && allequal(xs)) # all options are equal
 )
 
-connects_to_end(f1::RootFragment, f2::RootFragment) = edges(f1)[end] == edges(f2)[1]
-connects_to_start(f1::RootFragment, f2::RootFragment) = edges(f1)[1] == edges(f2)[end]
+connects_to_end(rf1::RootFragment, rf2::RootFragment) = edges(rf1)[end] == edges(rf2)[1]
+connects_to_start(rf1::RootFragment, rf2::RootFragment) = edges(rf1)[1] == edges(rf2)[end]
 
-stitch_to_end!(f1::RootFragment, f2::RootFragment) = append!(f1.edges, f2.edges[2:end])
-stitch_to_start!(f1::RootFragment, f2::RootFragment) = prepend!(f1.edges, f2.edges[1:end-1])
+stitch_to_end!(rf1::RootFragment, rf2::RootFragment) = append!(rf1.edges, rf2.edges[2:end])
+stitch_to_start!(rf1::RootFragment, rf2::RootFragment) = prepend!(rf1.edges, rf2.edges[1:end-1])
 
-function get_roots(fs::Vector{RootFragment{T}}) where {T}
+function get_roots(rfs::Vector{RootFragment{T}}) where {T}
     roots = Union{SimpleRoot{T}, CompositeRoot{T}}[]
     # roots consisting of a single root fragment
-    complete_fragments = filter(is_fullgrown, fs)
-    append!(roots, Root[SimpleRoot(is_primary(f), f) for f in complete_fragments])
+    complete_fragments = filter(is_fullgrown, rfs)
+    append!(roots, Root[SimpleRoot(is_primary(rf), rf) for rf in complete_fragments])
 
     # roots consisting of multiple root fragments
-    incomplete_fragments = filter(!is_fullgrown, fs)
+    incomplete_fragments = filter(!is_fullgrown, rfs)
 
     # keep going until all incomplete root fragments are used
     while !isempty(incomplete_fragments)
@@ -128,20 +128,20 @@ function get_roots(fs::Vector{RootFragment{T}}) where {T}
         # grow until complete
         while !is_fullgrown(root) && growing
             fragment = fragments(root)[end]
-            f_end_idxs = findall(f -> connects_to_end(fragment, f), incomplete_fragments)
-            if !isempty(f_end_idxs)
-                push!(fragments(root), incomplete_fragments[f_end_idxs[1]])
-                deleteat!(incomplete_fragments, f_end_idxs[1])
+            rf_end_idxs = findall(rf -> connects_to_end(fragment, rf), incomplete_fragments)
+            if !isempty(rf_end_idxs)
+                push!(fragments(root), incomplete_fragments[rf_end_idxs[1]])
+                deleteat!(incomplete_fragments, rf_end_idxs[1])
             end
 
             fragment = fragments(root)[1]
-            f_start_idxs = findall(f -> connects_to_start(fragment, f), incomplete_fragments)
-            if !isempty(f_start_idxs)
-                pushfirst!(fragments(root), incomplete_fragments[f_start_idxs[1]])
-                deleteat!(incomplete_fragments, f_start_idxs[1])
+            rf_start_idxs = findall(rf -> connects_to_start(fragment, rf), incomplete_fragments)
+            if !isempty(rf_start_idxs)
+                pushfirst!(fragments(root), incomplete_fragments[rf_start_idxs[1]])
+                deleteat!(incomplete_fragments, rf_start_idxs[1])
             end
 
-            growing = !(isempty(f_end_idxs) && isempty(f_start_idxs))
+            growing = !(isempty(rf_end_idxs) && isempty(rf_start_idxs))
         end
         push!(roots, root)
     end

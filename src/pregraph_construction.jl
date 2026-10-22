@@ -196,8 +196,8 @@ dist(x1::Real, y1::Real, x2::Real, y2::Real) = sqrt((y2-y1)^2 + (x2-x1)^2)
 # adds new metavertices and segments to differentiate them
 # like so
 #      /---\            /-o-\
-#   --o    o--   =>  --o    o--
-#     \---/            \-o-/
+#   --o     o--  =>  --o     o--
+#      \---/            \-o-/
 function differentiate_duplicates!(
         metavertices::Vector{MetaVertex{T, U}},
         segments::Vector{Segment{T, V}}; min_pixels
