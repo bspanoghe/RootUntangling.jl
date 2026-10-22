@@ -8,7 +8,7 @@ end
 is_primary(rf::RootFragment) = rf.is_primary
 edges(rf::RootFragment) = rf.edges
 is_fullgrown(rf::RootFragment) = all(is_augmented.(edges(rf)[[1, end]]))
-vertices(rf::RootFragment) = unique(Iterators.flatten(vertices.(edges(rf))))
+vertices(rf::RootFragment) = vertices.(edges(rf)) |> vs -> [first.(vs); last(vs[end])]
 
 
 """
