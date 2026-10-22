@@ -6,9 +6,9 @@ Makie.convert_arguments(::Type{<:Scatter}, rv::RootVertex) = (x(rv), y(rv))
 Makie.convert_arguments(::Type{<:Scatter}, rvs::Vector{<:RootVertex}) = (x.(rvs), y.(rvs))
 
 # ### Edges
-Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, re::RootEdge) = (xs(rg, re), ys(rg, re))
-Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, res::Vector{<:RootEdge}) = (
-    reduce(vcat, [[xs(rg, re); NaN] for re in res]), reduce(vcat, [[ys(rg, re); NaN] for re in res])
+Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, ae::AbstractEdge) = (xs(rg, ae), ys(rg, ae))
+Makie.convert_arguments(::Type{<:Lines}, rg::RootGraph, aes::Vector{<:AbstractEdge}) = (
+    reduce(vcat, [[xs(rg, ae); NaN] for ae in aes]), reduce(vcat, [[ys(rg, ae); NaN] for ae in aes])
 )
 
 

@@ -2,15 +2,15 @@
 getrootvertex(rg::RootGraph{T, U}, v::T) where {T, U} = v > 0 ? V₀(rg)[v] : V₊(rg)[-v]
 
 # get coords from edges
-xs(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = x.(V(rg, re))
-ys(rg::RootGraph{T, U}, re::RootEdge{T, U}) where {T, U} = y.(V(rg, re))
+xs(rg::RootGraph{T, U}, ae::AbstractEdge) where {T, U} = x.(V(rg, ae))
+ys(rg::RootGraph{T, U}, ae::AbstractEdge) where {T, U} = y.(V(rg, ae))
 
 # get neighbors
-neighbor(rv::RootVertex{T, U}, re::RootEdge{T, U}) where {T, U} = (
-    vertices(re)[findfirst(v -> v != id(rv), vertices(re))]
+neighbor(rv::RootVertex{T, U}, ae::AbstractEdge) where {T, U} = (
+    vertices(ae)[findfirst(v -> v != id(rv), vertices(ae))]
 )
-neighbor(rg::RootGraph{T, U}, rv::RootVertex{T, U}, re::RootEdge{T, U}) where {T, U} = (
-    getrootvertex(rg, neighbor(rv, re))
+neighbor(rg::RootGraph{T, U}, rv::RootVertex{T, U}, ae::AbstractEdge) where {T, U} = (
+    getrootvertex(rg, neighbor(rv, ae))
 )
 neighbors(rg::RootGraph{T, U}, rv::RootVertex{T, U}) where {T, U} = [neighbor(rg, rv, re) for re in edges(rv)]
 
