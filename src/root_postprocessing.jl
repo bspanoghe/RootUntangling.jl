@@ -14,17 +14,28 @@ function greedy_switch(rg::RootGraph, rs::RootSystem; max_tries = 100, f_obj::Fu
     )
 end
 
-function greedy_switch(rg::RootGraph, rss::Vector{<:RootSystem}; max_tries = 100, f_obj::Function = weighted_tortuosity)
+function greedy_switch(rg::RootGraph, rss::Vector{RootSystem{T}}; max_tries = 100, f_obj::Function = weighted_tortuosity) where {T}
     
+    composite_primaries = filter(r -> r isa CompositeRoot, primary.(rss))
     composite_laterals = reduce(vcat, [filter(r -> r isa CompositeRoot, laterals(rs)) for rs in rss])
-    if isempty(composite_laterals)
-        @info "Root systems have no overlaps"
+    
+    if isempty(composite_primaries) && isempty(composite_laterals)
+        @info "Root system has no overlaps"
         return rss
     end
-    composite_laterals_switched = greedy_switch(rg, composite_laterals; max_tries, f_obj)
+
+    @debug "Primaries"
+    composite_primaries_switched = isempty(composite_primaries) ?
+        SimpleRoot{T}[] : greedy_switch(rg, composite_primaries; max_tries, f_obj)
+
+    @debug "Laterals"
+    composite_laterals_switched = isempty(composite_laterals) ?
+        SimpleRoot{T}[] : greedy_switch(rg, composite_laterals; max_tries, f_obj)
+
+    simple_primaries = filter(r -> r isa SimpleRoot, primary.(rss))
     simple_laterals = reduce(vcat, [filter(r -> r isa SimpleRoot, laterals(rs)) for rs in rss])
 
-    return separate_root_systems(rg, primary.(rss), [simple_laterals; composite_laterals_switched])
+    return separate_root_systems(rg, [simple_primaries; composite_primaries_switched], [simple_laterals; composite_laterals_switched])
 end
 
 function greedy_switch(rg::RootGraph, roots::Vector{<:Root}; max_tries::Integer, f_obj::Function)
