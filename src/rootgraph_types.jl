@@ -46,7 +46,6 @@ function RootEdge(s::Segment)
     return RootEdge(src, dst, id(s), width(s), pred_primary(s), src_angle, dst_angle)
 end
 
-segment_id(re::RootEdge) = re.segment_id
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
 src_angle(re::RootEdge) = re.src_angle
