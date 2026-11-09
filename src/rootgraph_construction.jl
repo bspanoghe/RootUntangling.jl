@@ -1,12 +1,12 @@
 """
     get_rootgraph(filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1, [colnames...]
+        cluster_threshold::Real, reverse_y::Bool, pₛ::Real = 0.2, nₕ_min::Integer = 1, [colnames...]
     )
 
 Create a rootgraph from two files containing segment and vertex information.
 
 # General keyword arguments
-- `dist_threshold::Real`: The distance below which branchpoints are considered to be the same and will be merged.
+- `cluster_threshold::Real`: The distance below which branchpoints are considered to be the same and will be merged.
 - `reverse_y::Bool`: Reverse the y-coordinates? Use this to ensure the root system is oriented with the highest y-values at the top (affects results of solving).
 - `pₛ::Real`: The quantile of all widths in the graph to use as the width of a single root.
 - `nₕ_min::Integer`: The minimum amount of roots possibly present in each edge of the graph.
@@ -26,7 +26,7 @@ For the file containing edge/segment information.
 """
 function get_rootgraph(
         filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, reverse_y::Bool, angle_correction::Function = identity,
+        cluster_threshold::Real, reverse_y::Bool, angle_correction::Function = identity,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
         x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
         segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
@@ -34,7 +34,7 @@ function get_rootgraph(
     )
 
     pg = get_pregraph(
-        filename_segments, filename_vertices; dist_threshold, reverse_y, angle_correction,
+        filename_segments, filename_vertices; cluster_threshold, reverse_y, angle_correction,
         node_id_colname, segment_ids_colname, x_colname, y_colname, lateral_score_colname, 
         segment_id_colname, dist_colname, primary_score_colname, coords_colname, angles_colname
     )

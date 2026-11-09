@@ -43,7 +43,7 @@ md"## Data reading"
 begin
     nₕ_min = 1
     pₛ = 0.2
-    dist_threshold = 3
+    cluster_threshold = 3
     reverse_y = true
 end;
 
@@ -57,7 +57,7 @@ md"## Data visualisation"
 begin
     filename_segments = "../data/ROI_$(roi_nr)/segment_info_with_coords.csv"
     filename_vertices = "../data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    rg = get_rootgraph(filename_segments, filename_vertices; dist_threshold, reverse_y, pₛ, nₕ_min)
+    rg = get_rootgraph(filename_segments, filename_vertices; cluster_threshold, reverse_y, pₛ, nₕ_min)
 end
 
 # ╔═╡ 3f40ee53-68ad-4bfa-a784-bbad4a366f02
