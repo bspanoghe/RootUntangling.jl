@@ -3,13 +3,13 @@
 
 Extract the rootsystems from a graph `rg` and its solution contained in `model`.
 """
-function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
+function get_rootsystems(rg::RootGraph{T, U}, pg::PreGraph, model::JuMP.Model) where {T, U}
     
     # get primary roots
     c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp₊])) + round.(Int64, value.(model[:cp₋])))
     c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cp₊])))
 
-    primary_fragments = fragment(rg, true, c_counts, c₊_counts)
+    primary_fragments = fragment(rg, pg, true, c_counts, c₊_counts)
     stitch_fragments!(primary_fragments)
     primary_roots = get_roots(primary_fragments)
 
@@ -17,26 +17,27 @@ function get_rootsystems(rg::RootGraph{T, U}, model::JuMP.Model) where {T, U}
     c_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl₊])) + round.(Int64, value.(model[:cl₋])))
     c₊_counts = Dict(E₂(rg) .=> round.(Int64, value.(model[:cl₊])))
 
-    lateral_fragments = fragment(rg, false, c_counts, c₊_counts)
+    lateral_fragments = fragment(rg, pg, false, c_counts, c₊_counts)
     stitch_fragments!(lateral_fragments)
     lateral_roots = get_roots(lateral_fragments)
 
-    return separate_root_systems(rg, primary_roots, lateral_roots)
+    return separate_root_systems(primary_roots, lateral_roots)
 end
 
-function fragment(rg::RootGraph{T, U}, is_primary::Bool, c_counts::Dict, c₊_counts::Dict) where {T, U}
+function fragment(rg::RootGraph{T, U}, pg::PreGraph, is_primary::Bool, c_counts::Dict, c₊_counts::Dict) where {T, U}
 
-    fragments = RootFragment{T}[]
+    fragments = RootFragment{T, U}[]
 
     for c in filter(c -> c_counts[c] > 0, E₂(rg))
         v_shared = shared_vertex(c)
+        segments = pg.segments[[findfirst(s -> id(s) == segment_id(e), pg.segments) for e in c]]
 
         for i in 1:c₊_counts[c] # connection goes from edge 1 to 2
-            add_fragment!(fragments, is_primary, c, v_shared, switch_edges = false)
+            add_fragment!(rg, fragments, segments, is_primary, c, v_shared, switch_edges = false)
         end
 
         for i in 1:(c_counts[c]-c₊_counts[c]) # connection goes from edge 2 to 1
-            add_fragment!(fragments, is_primary, c, v_shared, switch_edges = true)
+            add_fragment!(rg, fragments, segments, is_primary, c, v_shared, switch_edges = true)
         end
     end
 
@@ -44,22 +45,22 @@ function fragment(rg::RootGraph{T, U}, is_primary::Bool, c_counts::Dict, c₊_co
 end
 
 shared_vertex(c::Vector{<:AbstractEdge}) = vertices(c[1])[findfirst(v -> in(v, vertices(c[2])), vertices(c[1]))]
-function add_fragment!(fragments::Vector{<:RootFragment}, is_primary::Bool,
-        c::Vector{<:RootEdge}, v_shared; switch_edges::Bool
+function add_fragment!(rg::RootGraph, fragments::Vector{<:RootFragment}, segments::Vector{<:Segment},
+        is_primary::Bool, c::Vector{<:RootEdge}, v_shared; switch_edges::Bool
     )
     if !switch_edges
         push!(fragments, RootFragment(
             is_primary, 
             [
-                RootArc(c[1], keep_order = (dst(c[1]) == v_shared)),
-                RootArc(c[2], keep_order = (src(c[2]) == v_shared))
+                RootArc(rg, c[1], segments[1], keep_order = (dst(c[1]) == v_shared)),
+                RootArc(rg, c[2], segments[2], keep_order = (src(c[2]) == v_shared))
             ])
         )
     else
         push!(fragments, RootFragment(is_primary,
             [
-                RootArc(c[2], keep_order = (dst(c[2]) == v_shared)),
-                RootArc(c[1], keep_order = (src(c[1]) == v_shared))
+                RootArc(rg, c[2], segments[2], keep_order = (dst(c[2]) == v_shared)),
+                RootArc(rg, c[1], segments[1], keep_order = (src(c[1]) == v_shared))
             ])
         )
     end
@@ -107,8 +108,8 @@ connects_to_start(rf1::RootFragment, rf2::RootFragment) = edges(rf1)[1] == edges
 stitch_to_end!(rf1::RootFragment, rf2::RootFragment) = append!(rf1.edges, rf2.edges[2:end])
 stitch_to_start!(rf1::RootFragment, rf2::RootFragment) = prepend!(rf1.edges, rf2.edges[1:end-1])
 
-function get_roots(rfs::Vector{RootFragment{T}}) where {T}
-    roots = Union{SimpleRoot{T}, CompositeRoot{T}}[]
+function get_roots(rfs::Vector{RootFragment{T, U}}) where {T, U}
+    roots = Union{SimpleRoot{T, U}, CompositeRoot{T, U}}[]
     # roots consisting of a single root fragment
     complete_fragments = filter(is_fullgrown, rfs)
     append!(roots, Root[SimpleRoot(is_primary(rf), rf) for rf in complete_fragments])
@@ -150,7 +151,7 @@ function get_roots(rfs::Vector{RootFragment{T}}) where {T}
 end
 
 # divide roots into separate root systems
-function separate_root_systems(rg::RootGraph, primary_roots::Vector{<:Root}, lateral_roots::Vector{<:Root})
+function separate_root_systems(primary_roots::Vector{<:Root}, lateral_roots::Vector{<:Root})
     lateral_match_dict = Dict{Root, Int64}()
 
     for lateral_root in lateral_roots
@@ -162,7 +163,7 @@ function separate_root_systems(rg::RootGraph, primary_roots::Vector{<:Root}, lat
             )
         else # lateral appears straight up out of nowhere
             lateral_match_dict[lateral_root] = findmin(
-                pr -> distance(rg, V₀(rg, lateral_root)[1], pr), 
+                pr -> distance(pr, xs(lateral_root)[1], ys(lateral_root)[1]), 
                 primary_roots
             )[2] # findmin returns (element, idx)
         end
@@ -174,7 +175,7 @@ function separate_root_systems(rg::RootGraph, primary_roots::Vector{<:Root}, lat
     ]
 
     for rs in rootsystems
-        sort!(laterals(rs), by = r -> curve_length(rg, r), rev = true)
+        sort!(laterals(rs), by = r -> curve_length(r), rev = true)
     end
     
     return rootsystems

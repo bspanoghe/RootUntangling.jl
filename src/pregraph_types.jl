@@ -5,14 +5,14 @@ isspecial(v::Integer) = v < 0
 mutable struct Segment{T, U}
     id::T
     vertices::Vector{T}
+    xs::Vector{U}
+    ys::Vector{U}
     width::U
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove later
-    xs::Vector{<:Number}
-    ys::Vector{<:Number}
     angles::Vector{U}
 end
 
-Segment(id, vertices) = Segment(id, vertices, NaN, NaN, Number[], Number[], [NaN, NaN])
+Segment(id, vertices) = Segment(id, vertices, Float64[], Float64[], NaN, NaN, [NaN, NaN])
 id(s::Segment) = s.id
 vertices(s::Segment) = s.vertices
 width(s::Segment) = s.width
@@ -50,29 +50,29 @@ distance(mv1::MetaVertex, mv2::MetaVertex) = (coords(mv1) - coords(mv2)) .^ 2 |>
 angle(x1::Real, y1::Real, x2::Real, y2::Real) = atan(y2 - y1, x2 - x1)
 angle(mv1::MetaVertex, mv2::MetaVertex) = angle(x(mv1), y(mv1), x(mv2), y(mv2))
 
-struct PreGraph{T, U, V}
+struct PreGraph{T, U}
     vertices::Vector{T}
     segments::Vector{Segment{T, U}}
-    metavertexdict::Dict{T, MetaVertex{T, V}}
+    metavertexdict::Dict{T, MetaVertex{T, U}}
     neighbordict::Dict{T, Vector{T}}
 
     # check that ids of normal vertices equals `1:length(normal_vertices)` and ids of special vertices equals `-1:-length(special_vertices)`
     function PreGraph(
             vertices::Vector{T}, segments::Vector{Segment{T, U}},
-            metavertexdict::Dict{T, MetaVertex{T, V}}, neighbordict::Dict{T, Vector{T}}
-        ) where {T, U, V}
+            metavertexdict::Dict{T, MetaVertex{T, U}}, neighbordict::Dict{T, Vector{T}}
+        ) where {T, U}
 
         normalvertices = [v for v in vertices if !isspecial(v)]
         specialvertices = [v for v in vertices if isspecial(v)]
         @assert issetequal(normalvertices, 1:length(normalvertices))
         @assert issetequal(specialvertices, -1:-1:-length(specialvertices))
 
-        return new{T, U, V}(vertices, segments, metavertexdict, neighbordict)
+        return new{T, U}(vertices, segments, metavertexdict, neighbordict)
     end
 end
 
 # automatically generate neighbordict from other fields
-function PreGraph(_vertices::Vector{T}, _segments::Vector{Segment{T, U}}, _metavertexdict::Dict{T, MetaVertex{T, V}}) where {T, U, V}
+function PreGraph(_vertices::Vector{T}, _segments::Vector{Segment{T, U}}, _metavertexdict::Dict{T, MetaVertex{T, U}}) where {T, U}
     neighbordict = Dict{T, Vector{T}}()
     for s in _segments
         v1, v2 = vertices(s)
@@ -90,7 +90,8 @@ segments(pg::PreGraph{T, U}, v::T) where {T, U} = [s for s in segments(pg) if v 
 segments(pg::PreGraph{T, U}, mv::MetaVertex{T, U}) where {T, U} = segments(pg, id(mv))
 getmetavertex(pg::PreGraph{T, U}, v::T) where {T, U} = pg.metavertexdict[v]
 getmetavertices(pg::PreGraph) = [getmetavertex(pg, v) for v in vertices(pg)]
-neighbors(pg::PreGraph{T, U, V}, v::T) where {T, U, V} = pg.neighbordict[v]
+getsegments(pg::PreGraph{T, U}, segment_id::T) where {T, U} = segments(pg)[id.segments(pg) .== segment_id]
+neighbors(pg::PreGraph{T, U}, v::T) where {T, U} = pg.neighbordict[v]
 
 outer_vertices(pg::PreGraph) = [v for v in vertices(pg) if length(neighbors(pg, v)) == 1]
 inner_vertices(pg::PreGraph) = [v for v in vertices(pg) if length(neighbors(pg, v)) > 1]

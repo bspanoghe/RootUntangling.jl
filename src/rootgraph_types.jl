@@ -51,17 +51,6 @@ pred_primary(re::RootEdge) = re.pred_primary
 src_angle(re::RootEdge) = re.src_angle
 dst_angle(re::RootEdge) = re.dst_angle
 
-# Like a RootEdge but then directed! (used in root construction)
-struct RootArc{T} <: AbstractEdge
-    src::T
-    dst::T
-    segment_id::T
-end
-RootArc(re::RootEdge; keep_order::Bool) = (
-    keep_order ? RootArc(src(re), dst(re), segment_id(re)) : 
-        RootArc(dst(re), src(re), segment_id(re))
-)
-
 # vertices
 """
     RootVertex{T, U}
