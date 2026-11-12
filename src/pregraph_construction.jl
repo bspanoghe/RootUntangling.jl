@@ -49,9 +49,9 @@ function get_pregraph(edge_data_dict::Dict, vertex_data_dict::Dict;
     segments = getsegments(metavertices, vertex_data_dict, edge_data_dict)
 
     # clean
-    differentiate_single_vertex_segments!(metavertices, segments; min_pixels)
+    differentiate_single_vertex_segments!(metavertices, segments; loop_threshold)
     cluster_vertices!(segments, metavertices; dist_threshold)
-    differentiate_duplicates!(metavertices, segments; min_pixels)
+    differentiate_duplicates!(metavertices, segments; loop_threshold)
     remove_unconnected_vertices!(metavertices, segments)
     remake_ids!(metavertices, segments)
 
@@ -226,7 +226,7 @@ function differentiate_duplicates!(
     duplicates = duplicate_elements(s -> sort(vertices(s)), segments)
     
     # delete segments below pixel length threshold
-    tiny_duplicate_idxs = findall(s -> length(xs(s)) < min_pixels, duplicates)
+    tiny_duplicate_idxs = findall(s -> length(xs(s)) < loop_threshold, duplicates)
     deleteat!(segments, tiny_duplicate_idxs)
     
     # stop if no (more) duplicates
