@@ -26,11 +26,13 @@ function greedy_switch(rss::Vector{RootSystem{T, U}}; max_tries = 100, f_obj::Fu
 
     @debug "Primaries"
     composite_primaries_switched = isempty(composite_primaries) ?
-        SimpleRoot{T, U}[] : greedy_switch(composite_primaries; max_tries, f_obj)
+        SimpleRoot{T, U}[] : isempty(find_overlaps(composite_primaries)) ?
+        composite_primaries : greedy_switch(composite_primaries; max_tries, f_obj)
 
     @debug "Laterals"
     composite_laterals_switched = isempty(composite_laterals) ?
-        SimpleRoot{T, U}[] : greedy_switch(composite_laterals; max_tries, f_obj)
+        SimpleRoot{T, U}[] : isempty(find_overlaps(composite_laterals)) ?
+        composite_laterals : greedy_switch(composite_laterals; max_tries, f_obj)
 
     simple_primaries = filter(r -> r isa SimpleRoot, primary.(rss))
     simple_laterals = reduce(vcat, [filter(r -> r isa SimpleRoot, laterals(rs)) for rs in rss])
