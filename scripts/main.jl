@@ -10,11 +10,11 @@ ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
 playground_dir = "playground"
-difficulty = "easy"
+difficulty = "intermediate"
 validation_dir = "validation/$(difficulty)"
 
 directory = validation_dir
-roi_nr = 1
+roi_nr = 5
 
 # read data
 
@@ -56,11 +56,9 @@ begin
     f_multi
 end
 
-subidx = 2
+subidx = 1
 rg = rgs[subidx]
 graphplot(rg, augmented_alpha = 0.01)
-ap = annotation_plot(rg, size = (2000, 4000));
-save(homedir() * "/Downloads/thefuckingmimeryyy.svg", ap)
 
 # NN predictions
 lines(
@@ -70,8 +68,8 @@ lines(
 # savefig(homedir() * "\\Downloads\\wa.svg")
 
 model, time = @timed solve_rsa(
-    rg; optimizer = Gurobi.Optimizer, time_limit = 2*60,
-    num_roots = 1, max_overlapping = 5,
+    rg; optimizer = HiGHS.Optimizer, time_limit = 2*60,
+    num_roots = 2, max_overlapping = 5,
     # ρₘ_max = 0.5, ρₘ_min = 0, ρᵧ_max = 0.5, ρᵧ_min = 0,
     # ρₛ = 0.5
 )
@@ -83,22 +81,15 @@ rss_new = greedy_switch(rss, f_obj = weighted_tortuosity);
 r1 = rootplot(rss, size = (600, 600), title = "Weighted tortuosity: $(weighted_tortuosity(rss))")
 r2 = rootplot(rss_new, size = (600, 600), title = "Weighted tortuosity: $(weighted_tortuosity(rss_new))")
 
-# lines(rss[1].primary)
-
-# begin
-#     waa = rss[1].laterals[24]
-#     QQ = Figure()
-#     scatter(QQ[1, 1], xs(waa), ys(waa))
-#     lines(QQ[2, 1], waa)
-#     QQ
-# end
 
 # save(homedir() * "/Downloads/test1.svg", r1)
 # save(homedir() * "/Downloads/test2.svg", r2)
 
-# ap = annotation_plot(rg, model)
-
+ap = annotation_plot(rg_full, size = (2000, 4000));
+save(homedir() * "/Downloads/thefuckingmimeryyysoto.svg", ap)
+ap = annotation_plot(rg, size = (2000, 4000));
+save(homedir() * "/Downloads/thefuckingmimeryyy.svg", ap)
 f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1200, 1500), vertex_kwargs = Dict(:markersize => 2))
 save(homedir() * "/Downloads/woagh.svg", f_g)
 r1 = rootplot(rss, size = (1200, 1500), title = "Weighted tortuosity: $(weighted_tortuosity(rss))")
-save(homedir() * "/Downloads/aghwuuu.pdf", r1)
+save(homedir() * "/Downloads/aghwuuu.svg", r1)
