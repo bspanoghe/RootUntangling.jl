@@ -9,11 +9,12 @@ import .Makie: HSV
 function fix_groundtruth(file::String)
     lines = readlines(file)
     filter!(!isempty, lines)
-    split.(lines, ',')
-    newtext = [
+    newlines = [
         length(split(line, ',')) == 2 ? line * ',' : line
         for line in lines
-    ] |> x -> *((x .* '\n')...)[1:end-1]
+    ]
+    isempty(split(newlines[1], ',')[end]) && (newlines[1] *= "real_length")
+    newtext = *((newlines .* '\n')...)[1:end-1]
 
     write(file, newtext)
 
@@ -77,7 +78,7 @@ laterals(vrs::ValRootSystem) = vrs.laterals
 roots(vrs::ValRootSystem) = [primary(vrs); laterals(vrs)]
 Base.length(vrs::ValRootSystem) = length(roots(vrs))
 
-function get_rsa_val(rg::RootGraph, segments, root_segment_mapping::Dict)
+function get_valrootsystem(rg::RootGraph, segments, root_segment_mapping::Dict)
     primary = ValRoot(
         true,
         filter(e -> e.segment_id ∈ root_segment_mapping[1], E₀(rg)),
@@ -114,9 +115,9 @@ function rootplot(vrs::ValRootSystem; size = (600, 400), line_kwargs::Dict = Dic
     return f
 end
 
-function add_dummy_roots!(rsa::RootSystem, rsa_val::ValRootSystem)
-    laterals_pred = laterals(rsa)
-    laterals_val = laterals(rsa_val)
+function add_dummy_roots!(rs::RootSystem, vrs::ValRootSystem)
+    laterals_pred = laterals(rs)
+    laterals_val = laterals(vrs)
     n_diff = length(laterals_pred) - length(laterals_val)
     n_diff < 0 && add_dummy_roots!(laterals_pred, abs(n_diff))
     n_diff > 0 && add_dummy_roots!(laterals_val, n_diff)
@@ -136,17 +137,17 @@ function add_dummy_roots!(roots::Vector{ValRoot{T, U}}, n_diff::Integer) where {
     return nothing
 end
 
-function get_loss(rsa::RootSystem, rsa_val::ValRootSystem, root_mapping::Vector{<:Integer}, metric::Function;
+function get_loss(rs::RootSystem, vrs::ValRootSystem, root_mapping::Vector{<:Integer}, metric::Function;
         verbose::Bool = false
     )
     # primary root
-    primary_dist = get_loss(primary(rsa), primary(rsa_val), metric)
+    primary_dist = get_loss(primary(rs), primary(vrs), metric)
 
     # laterals
     lateral_dist = 0
     for i in eachindex(root_mapping)
-        lateral_dist += get_loss(laterals(rsa), laterals(rsa_val), i, root_mapping[i], metric)
-        verbose && @info "Loss in root $(i): $(get_loss(laterals(rsa), laterals(rsa_val), i, root_mapping[i], metric))"
+        lateral_dist += get_loss(laterals(rs), laterals(vrs), i, root_mapping[i], metric)
+        verbose && @info "Loss in root $(i): $(get_loss(laterals(rs), laterals(vrs), i, root_mapping[i], metric))"
     end
 
     return primary_dist + lateral_dist
@@ -160,15 +161,23 @@ end
 
 full_setdiff(x1::AbstractArray, x2::AbstractArray) = [setdiff(x1, x2); setdiff(x2, x1)]
 
-function get_optimal_mapping(rs::Vector{<:Root}, rsv::Vector{<:ValRoot}, metric::Function; optimizer)
-    @assert length(rs) == length(rsv)
+function get_optimal_mapping(rs::RootSystem, vrs::ValRootSystem, metric::Function; optimizer)
+    return get_optimal_mapping(laterals(rs), laterals(vrs), metric; optimizer)
+end
+
+function get_optimal_mapping(rs::Vector{<:Root}, vrs::Vector{<:ValRoot}, metric::Function; optimizer)
     n = length(rs)
 
     loss_mat = [
-        get_loss(rs, rsv, i, j, metric)
+        get_loss(rs, vrs, i, j, metric)
         for i in 1:n, j in 1:n
     ]
   
+    return get_optimal_mapping(loss_mat; optimizer)
+end
+
+function get_optimal_mapping(loss_mat::Matrix{<:Number}; optimizer)
+    n = size(loss_mat, 1)
     model = Model(optimizer)
     @variable(model, mm[1:n, 1:n], Bin)
     @objective(model, Min, sum(loss_mat .* mm))
@@ -182,7 +191,64 @@ function get_optimal_mapping(rs::Vector{<:Root}, rsv::Vector{<:ValRoot}, metric:
     optimize!(model)
     is_solved_and_feasible(model)
     mm = round.(Bool, value.(model[:mm]))
-    return [findfirst(r) for r in eachrow(mm)]
+    return [findfirst(c) for c in eachcol(mm)]
+end
+
+function get_optimal_mappings(rss::Vector{<:RootSystem}, vrss::Vector{<:ValRootSystem}, metric::Function; optimizer)
+    add_dummy_rootsystems!(rss, vrss)
+    n = length(rss)
+
+    loss_mat = [
+        get_optimal_loss(rss[i], vrss[j], metric; optimizer)
+        for i in 1:n, j in 1:n
+    ]
+
+    get_optimal_mapping(loss_mat; optimizer)
+end
+
+function add_dummy_rootsystems!(rss::Vector{<:RootSystem}, vrss::Vector{<:ValRootSystem})
+    n_diff = length(rss) - length(vrss)
+    n_diff < 0 && add_dummy_roots!(rss, abs(n_diff))
+    n_diff > 0 && add_dummy_roots!(vrss, n_diff)
+
+    return nothing
+end
+
+function add_dummy_rootsystems!(rss::Vector{RootSystem{T, U}}, n_diff::Integer) where {T, U}
+    append!(
+        rss, 
+        fill(
+            RootSystem(
+                SimpleRoot(true, RootFragment(false, RootArc{T}[])),
+                Union{SimpleRoot{T, U}, CompositeRoot{T, U}}[], 
+            ),
+            n_diff
+        )
+    )
+
+    return nothing
+end
+
+function add_dummy_roots!(vrss::Vector{ValRootSystem{T, U}}, n_diff::Integer) where {T, U}
+    append!(
+        vrss,
+        fill(
+            ValRootSystem(
+                ValRoot(true, RootEdge{T, U}[], U[], U[]),
+                ValRoot{T, U}[]
+            ),
+            n_diff
+        )
+    )
+
+    return nothing
+end
+
+function get_optimal_loss(rs::RootSystem, vrs::ValRootSystem, metric::Function; optimizer)
+    rs, vrs = deepcopy(rs), deepcopy(vrs)
+    add_dummy_roots!(rs, vrs)
+    mapping = get_optimal_mapping(rs, vrs, metric; optimizer)
+    return get_loss(rs, vrs, mapping, metric)
 end
 
 standard_segments(r::Root) = filter(!is_augmented, segment_id.(edges(r)))
@@ -215,7 +281,7 @@ begin
     ]
 end
 
-rsa = rss_new[1]
+rsa = rss_new[2]
 
 begin
     vertex_data_dict, edge_data_dict = RootUntangling.get_data_dicts(filename_segments, filename_vertices; reverse_y, angle_correction)
@@ -223,33 +289,26 @@ begin
     segments = RootUntangling.getsegments(metavertices, vertex_data_dict, edge_data_dict)
     RootUntangling.sort_segment_coordinates!(segments, metavertices)
 
-    rsa_nr = 3
-    rsa_val = get_rsa_val(rg_full, segments, root_segment_mappings[rsa_nr])
+    rsa_nr = 2
+    vrs = get_valrootsystem(rg_full, segments, root_segment_mappings[rsa_nr])
     f = Figure()
     rootplot!(Axis(f[1, 1]), rsa)
     f[1, 2] = Legend(f, f.content[end])
-    rootplot!(Axis(f[1, 3]), rsa_val)
+    rootplot!(Axis(f[1, 3]), vrs)
     f[1, 4] = Legend(f, f.content[end])
     f
 end
 
-add_dummy_roots!(rsa, rsa_val)
-
-using Random
-n = length(laterals(rsa))
 metric = pixels
+optimal_mapping = get_optimal_mapping(rsa, vrs, metric, optimizer = HiGHS.Optimizer)
 
-losses = [get_loss(rsa, rsa_val, shuffle(1:n), metric) for _ in 1:1_000]
-hist(losses)
-minimum(losses)
-
-optimal_mapping = get_optimal_mapping(laterals(rsa), laterals(rsa_val), metric, optimizer = HiGHS.Optimizer)
-laterals(rsa_val) .= laterals(rsa_val)[optimal_mapping]
-final_loss = get_loss(rsa, rsa_val, collect(1:n), metric, verbose = true)
+add_dummy_roots!(rsa, vrs)
+laterals(rsa) .= laterals(rsa)[optimal_mapping]
+final_loss = get_loss(rsa, vrs, optimal_mapping, metric, verbose = true)
 
 begin
     f = Figure()
-    rootplot!(Axis(f[1, 1]), rsa_val)
+    rootplot!(Axis(f[1, 1]), vrs)
     f[1, 2] = Legend(f, f.content[end])
     rootplot!(Axis(f[1, 3]), rsa)
     f[1, 4] = Legend(f, f.content[end])
