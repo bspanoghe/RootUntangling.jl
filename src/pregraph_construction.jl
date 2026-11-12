@@ -50,7 +50,7 @@ function get_pregraph(edge_data_dict::Dict, vertex_data_dict::Dict;
 
     # clean
     differentiate_single_vertex_segments!(metavertices, segments; loop_threshold)
-    cluster_vertices!(segments, metavertices; dist_threshold)
+    cluster_vertices!(segments, metavertices; cluster_threshold)
     differentiate_duplicates!(metavertices, segments; loop_threshold)
     remove_unconnected_vertices!(metavertices, segments)
     remake_ids!(metavertices, segments)
