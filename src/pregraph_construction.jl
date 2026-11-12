@@ -35,8 +35,8 @@ function get_pregraph(edge_data_dict::Dict, vertex_data_dict::Dict;
     # clean
     differentiate_single_vertex_segments!(metavertices, segments; min_pixels)
     cluster_vertices!(segments, metavertices; dist_threshold)
-    remove_unconnected_vertices!(metavertices, segments)
     differentiate_duplicates!(metavertices, segments; min_pixels)
+    remove_unconnected_vertices!(metavertices, segments)
     remake_ids!(metavertices, segments)
 
     # augmentation
@@ -203,9 +203,14 @@ function differentiate_duplicates!(
         segments::Vector{Segment{T, V}}; min_pixels
     ) where {T, U, V}
 
-    # find "duplicate" segments with proper length
+    # find "duplicate" segments
     duplicates = duplicate_elements(s -> sort(vertices(s)), segments)
-    filter!(s -> length(xs(s)) >= min_pixels, duplicates)
+    
+    # delete segments below pixel length threshold
+    tiny_duplicate_idxs = findall(s -> length(xs(s)) < min_pixels, duplicates)
+    deleteat!(segments, tiny_duplicate_idxs)
+    
+    # stop if no (more) duplicates
     isempty(duplicates) && return nothing
 
     # check validity
