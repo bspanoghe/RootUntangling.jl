@@ -49,6 +49,7 @@ function get_pregraph(edge_data_dict::Dict, vertex_data_dict::Dict;
     segments = getsegments(metavertices, vertex_data_dict, edge_data_dict)
 
     # clean
+    sort_segment_coordinates!(segments, metavertices)
     differentiate_single_vertex_segments!(metavertices, segments; loop_threshold)
     cluster_vertices!(segments, metavertices; cluster_threshold)
     differentiate_duplicates!(metavertices, segments; loop_threshold)
@@ -104,31 +105,34 @@ end
 function sort_segment_coordinates!(segments::Vector{<:Segment}, metavertices::Vector{<:MetaVertex})
     for s in segments
         mv = metavertices[findfirst(mv -> id(mv) == vertices(s)[1], metavertices)]
-        sort_segment_coordinates!(s, mv)
+        sort_coordinates!(s.xs, s.ys, x(mv), y(mv))
     end
 
     return nothing
 end
 
-# sort coordinates of a segment starting from a given metavertex
-function sort_segment_coordinates!(s::Segment, mv::MetaVertex)
-    # :)
-    xs, ys = (s.xs, s.ys)
-    # find closest point on segment to start
-    idx_closest = argmin(dist.([x(mv)], [y(mv)], xs, ys))
+# sort coordinates starting from a given point
+function sort_coordinates!(xs::Vector{<:Number}, ys::Vector{<:Number}, x0::Number, y0::Number)
+    # what isn't cannot be sorted
+    isempty(xs) && return nothing
+    # find closest point to starting point
+    idx_closest = argmin(dist.([x0], [y0], xs, ys))
     # instantiate new coordinates
     xs_new, ys_new = (similar(xs), similar(ys))
     xs_new[1], ys_new[1] = (xs[idx_closest], ys[idx_closest])
+    deleteat!(xs, 1)
+    deleteat!(ys, 1)
     # gettem!
-    for i in 2:length(xs)
+    for i in 2:length(xs_new)
         idx_closest = argmin(dist.([xs_new[i-1]], [ys_new[i-1]], xs, ys))
         xs_new[i], ys_new[i] = (xs[idx_closest], ys[idx_closest])
         deleteat!(xs, idx_closest)
         deleteat!(ys, idx_closest)
     end
 
-    s.xs, s.ys = (xs_new, ys_new)
-    
+    append!(xs, xs_new)
+    append!(ys, ys_new)
+
     return nothing
 end
 
