@@ -7,6 +7,8 @@ export get_rootsystems, primary, laterals, examine, curve_length # get and exami
 export greedy_switch, tortuosity, weighted_tortuosity # postprocess roots
 export graphplot, rootplot, annotation_plot # plotting
 export get_annotation_dict, write_annotation # write output
+export get_validation_data, get_optimal_mappings, standard_segments, pixels, add_dummy_roots!, get_loss
+
 # debugging exports
 export read_data, get_edge_info, get_vertex_info # data reading
 export get_pregraph # data to graph
@@ -30,5 +32,6 @@ include("root_construction.jl"); # get the roots
 include("root_postprocessing.jl"); # postprocessing on roots
 include("plotting.jl"); # visualisation
 include("annotation.jl"); # annotate graphs with root identities
+include("validation.jl"); # compare results with data
 
 end
