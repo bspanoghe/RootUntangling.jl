@@ -30,8 +30,8 @@ is_primary(rf::RootFragment) = rf.is_primary
 edges(rf::RootFragment) = rf.edges
 is_fullgrown(rf::RootFragment) = all(is_augmented.(edges(rf)[[1, end]]))
 vertices(rf::RootFragment) = vertices.(edges(rf)) |> vs -> [first.(vs); last(vs[end])]
-xs(rf::RootFragment) = reduce(vcat, xs.(edges(rf)))
-ys(rf::RootFragment) = reduce(vcat, ys.(edges(rf)))
+xs(rf::RootFragment{T, U}) where {T, U} = reduce(vcat, xs.(edges(rf)), init = U[])
+ys(rf::RootFragment{T, U}) where {T, U} = reduce(vcat, ys.(edges(rf)), init = U[])
 
 """
     Root
@@ -52,7 +52,8 @@ Base.length(r::Root) = length(edges(r))
 distance(x1::T, y1::T, x2::T, y2::T) where {T<:Number} = sqrt((y2-y1)^2 + (x2-x1)^2)
 distance(r::Root) = distance(xs(r)[1], ys(r)[1], xs(r)[end], ys(r)[end])
 distance(r::Root, x, y) = minimum(distance.([x], xs(r), [y], ys(r)))
-curve_length(r::Root) = sqrt.(diff(xs(r)) .^ 2 + diff(ys(r)) .^ 2) |> sum
+curve_length(xs::Vector{T}, ys::Vector{T}) where {T<:Number} = sqrt.(diff(xs) .^ 2 + diff(ys) .^ 2) |> sum
+curve_length(r::Root) = curve_length(xs(r), ys(r))
 tortuosity(r::Root) = curve_length(r) / distance(r)
 tortuosity(rs::Vector{<:Root}) = sum(tortuosity.(rs))
 weighted_tortuosity(r::Root) = curve_length(r) * tortuosity(r)
