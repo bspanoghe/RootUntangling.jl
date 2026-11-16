@@ -26,7 +26,7 @@ For the file containing edge/segment information.
 """
 function get_rootgraph(
         filename_segments::String, filename_vertices::String;
-        cluster_threshold::Real, reverse_y::Bool, angle_correction::Function = identity,
+        cluster_threshold::Real, loop_threshold::Real, reverse_y::Bool, angle_correction::Function = identity,
         node_id_colname = :Node, segment_ids_colname = :Segment_IDs,
         x_colname = :Coord_x, y_colname = :Coord_y, lateral_score_colname = :Lateral_Score,
         segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
@@ -34,7 +34,7 @@ function get_rootgraph(
     )
 
     pg = get_pregraph(
-        filename_segments, filename_vertices; cluster_threshold, reverse_y, angle_correction,
+        filename_segments, filename_vertices; cluster_threshold, loop_threshold, reverse_y, angle_correction,
         node_id_colname, segment_ids_colname, x_colname, y_colname, lateral_score_colname, 
         segment_id_colname, dist_colname, primary_score_colname, coords_colname, angles_colname
     )
