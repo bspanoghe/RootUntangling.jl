@@ -101,6 +101,7 @@ end
 
 function sort_root_coordinates!(vr::ValRoot, rg::RootGraph)
     vs = collect(Iterators.flatten(vertices.(edges(vr))))
+    isempty(vs) && return nothing
     v_start = vs[findfirst(v -> !(v in duplicate_elements(vs)), vs)]
     sort_coordinates!(vr.xs, vr.ys, V(rg, v_start).x, V(rg, v_start).y)
 
