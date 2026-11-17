@@ -49,7 +49,7 @@ function recreate_V₀(rv::RootVertex{T, U}, id_conversion_dict::Dict) where {T,
     res_new = RootEdge{T, U}[
         RootEdge(
             [id_conversion_dict[v] for v in vertices(re)]...,
-            [f(re) for f in [segment_id, width, pred_primary, src_angle, dst_angle]]...
+            [f(re) for f in [segment_id, og_segment_id, width, pred_primary, src_angle, dst_angle]]...
         )
         for re in E(rv) if all(haskey.([id_conversion_dict], vertices(re)))
     ]
@@ -64,7 +64,7 @@ function recreate_V₊(rv::RootVertex{T, U}, id_conversion_dict::Dict, recreated
     res_new = RootEdge{T, U}[
         RootEdge(
             [id_conversion_dict[v] for v in vertices(re)]..., 
-            [f(re) for f in [segment_id, width, pred_primary, src_angle, dst_angle]]...
+            [f(re) for f in [segment_id, og_segment_id, width, pred_primary, src_angle, dst_angle]]...
         )
         for re in E(rv) if all(haskey.([id_conversion_dict], vertices(re)))
     ]

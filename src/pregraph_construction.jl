@@ -1,7 +1,25 @@
 function get_pregraph(
         filename_segments::String, filename_vertices::String;
-        dist_threshold::Real, reverse_y::Bool, angle_correction::Function, node_id_colname = :Node,
-        segment_ids_colname = :Segment_IDs, x_colname = :Coord_x, y_colname = :Coord_y,
+        cluster_threshold::Real, loop_threshold::Real, reverse_y::Bool, angle_correction::Function, 
+        node_id_colname = :Node, segment_ids_colname = :Segment_IDs, x_colname = :Coord_x, y_colname = :Coord_y,
+        lateral_score_colname = :Lateral_Score, segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
+        primary_score_colname = :Heatmap_Mean, coords_colname = :Coords, angles_colname = :BP_Angles
+    )
+
+    vertex_data_dict, edge_data_dict = get_data_dicts(
+        filename_segments, filename_vertices; reverse_y, angle_correction, 
+        node_id_colname, segment_ids_colname, x_colname, y_colname,
+        lateral_score_colname, segment_id_colname, dist_colname,
+        primary_score_colname, coords_colname, angles_colname
+    )
+
+    return get_pregraph(edge_data_dict, vertex_data_dict; cluster_threshold, loop_threshold)
+end
+
+function get_data_dicts(
+        filename_segments::String, filename_vertices::String;
+        reverse_y::Bool, angle_correction::Function, 
+        node_id_colname = :Node, segment_ids_colname = :Segment_IDs, x_colname = :Coord_x, y_colname = :Coord_y,
         lateral_score_colname = :Lateral_Score, segment_id_colname = :Segment_ID, dist_colname = :Mean_Distance,
         primary_score_colname = :Heatmap_Mean, coords_colname = :Coords, angles_colname = :BP_Angles
     )
@@ -20,22 +38,21 @@ function get_pregraph(
         coords_colname, y_transform, angles_colname, angle_correction
     )
 
-    pg = get_pregraph(edge_data_dict, vertex_data_dict; dist_threshold)
-
-    return pg
+    return vertex_data_dict, edge_data_dict
 end
 
 function get_pregraph(edge_data_dict::Dict, vertex_data_dict::Dict; 
-        dist_threshold = 3, augmented_margins = 0.3, min_pixels = 5
+        cluster_threshold = 3, augmented_margins = 0.3, loop_threshold = 5
     )
     # get metavertices and segments
     metavertices = getmetavertices(vertex_data_dict)
     segments = getsegments(metavertices, vertex_data_dict, edge_data_dict)
 
     # clean
-    differentiate_single_vertex_segments!(metavertices, segments; min_pixels)
-    cluster_vertices!(segments, metavertices; dist_threshold)
-    differentiate_duplicates!(metavertices, segments; min_pixels)
+    sort_segment_coordinates!(segments, metavertices)
+    differentiate_single_vertex_segments!(metavertices, segments; loop_threshold)
+    cluster_vertices!(segments, metavertices; cluster_threshold)
+    differentiate_duplicates!(metavertices, segments; loop_threshold)
     remove_unconnected_vertices!(metavertices, segments)
     remake_ids!(metavertices, segments)
 
@@ -73,8 +90,8 @@ function getsegments(metavertices::Vector{MetaVertex{T, U}}, vertex_data_dict, e
     segments = [
         Segment(
             id, vertices,
-            [edge_data_dict[id][col] for col in [:width, :pred_primary, :xs, :ys]]...,
-            [get(edge_data_dict[id][:angle_dict], name(metavertices[findfirst(mv -> mv.id == v, metavertices)]), NaN) for v in vertices]
+            [float.(edge_data_dict[id][col]) for col in [:xs, :ys, :width, :pred_primary]]...,
+            [float(get(edge_data_dict[id][:angle_dict], name(metavertices[findfirst(mv -> mv.id == v, metavertices)]), NaN)) for v in vertices]
         )
         for (id, vertices) in segment_connections
     ]
@@ -85,28 +102,58 @@ end
 # # cleaning
 
 # ## segment cleaning
+function sort_segment_coordinates!(segments::Vector{<:Segment}, metavertices::Vector{<:MetaVertex})
+    for s in segments
+        mv = metavertices[findfirst(mv -> id(mv) == vertices(s)[1], metavertices)]
+        sort_coordinates!(s.xs, s.ys, x(mv), y(mv))
+    end
+
+    return nothing
+end
+
+# sort coordinates starting from a given point
+function sort_coordinates!(xs::Vector{<:Number}, ys::Vector{<:Number}, x0::Number, y0::Number)
+    # what isn't cannot be sorted
+    isempty(xs) && return nothing
+    # find closest point to starting point
+    idx_closest = argmin(dist.([x0], [y0], xs, ys))
+    # instantiate new coordinates
+    xs_new, ys_new = (similar(xs), similar(ys))
+    xs_new[1], ys_new[1] = (xs[idx_closest], ys[idx_closest])
+    deleteat!(xs, 1)
+    deleteat!(ys, 1)
+    # gettem!
+    for i in 2:length(xs_new)
+        idx_closest = argmin(dist.([xs_new[i-1]], [ys_new[i-1]], xs, ys))
+        xs_new[i], ys_new[i] = (xs[idx_closest], ys[idx_closest])
+        deleteat!(xs, idx_closest)
+        deleteat!(ys, idx_closest)
+    end
+
+    append!(xs, xs_new)
+    append!(ys, ys_new)
+
+    return nothing
+end
+
+dist(x1::Real, y1::Real, x2::Real, y2::Real) = sqrt((y2-y1)^2 + (x2-x1)^2)
+
 function differentiate_single_vertex_segments!(        
         metavertices::Vector{MetaVertex{T, U}},
-        segments::Vector{Segment{T, V}}; min_pixels
-    ) where {T, U, V}
+        segments::Vector{Segment{T, U}}; loop_threshold
+    ) where {T, U}
 
     # get indices of all single-vertex segments
     single_idxs = findall(length.(vertices.(segments)) .== 1)
     
     # filter out short single-vertex segments and delete them
-    short_single_idxs = length.(xs.(segments[single_idxs])) .< min_pixels
+    short_single_idxs = length.(xs.(segments[single_idxs])) .< loop_threshold
     singles = segments[single_idxs[.!short_single_idxs]]
     deleteat!(segments, single_idxs[short_single_idxs])
 
     # break if empty
     isempty(singles) && return nothing
     @debug "$(length(singles)) HOT SINGLES FOUND IN YOUR [Custom built personal living space]"
-
-    # sort coordinates of segments
-    for s in singles
-        mv = metavertices[findfirst(mv -> id(mv) == vertices(s)[1], metavertices)]
-        sort_segment_coordinates!(s, mv)
-    end
 
     # make new metavertices at halfpoints of singles
     v_max = id.(metavertices) |> maximum
@@ -139,11 +186,12 @@ function differentiate_single_vertex_segments!(
 
     # make new segments between startpoint and new midpoint
     seg_new = [
-        Segment{T, V}(
-            id(singles[i]), # note: segment ids don't need to be unique
+        Segment{T, U}(
+            maximum(id.(segments)) + i,
+            id(singles[i]),
             [vertices(singles[i])[1], id(mvs_new[i])],
-            [f(singles[i]) for f in [width, pred_primary]]...,
             xs(singles[i])[1:(end ÷ 2)], ys(singles[i])[1:(end ÷ 2)],
+            [f(singles[i]) for f in [width, pred_primary]]...,
             new_local_angles[i]
         )
         for i in eachindex(singles)
@@ -168,30 +216,6 @@ function differentiate_single_vertex_segments!(
     return nothing
 end
 
-# sort coordinates of a segment starting from a given metavertex
-function sort_segment_coordinates!(s::Segment, mv::MetaVertex)
-    # :)
-    xs, ys = (s.xs, s.ys)
-    # find closest point on segment to metavertex
-    idx_closest = argmin(dist.([x(mv)], [y(mv)], xs, ys))
-    # instantiate new coordinates
-    xs_new, ys_new = (similar(xs), similar(ys))
-    xs_new[1], ys_new[1] = (xs[idx_closest], ys[idx_closest])
-    # gettem!
-    for i in 2:length(xs)
-        idx_closest = argmin(dist.([xs_new[i-1]], [ys_new[i-1]], xs, ys))
-        xs_new[i], ys_new[i] = (xs[idx_closest], ys[idx_closest])
-        deleteat!(xs, idx_closest)
-        deleteat!(ys, idx_closest)
-    end
-
-    s.xs, s.ys = (xs_new, ys_new)
-    
-    return nothing
-end
-
-dist(x1::Real, y1::Real, x2::Real, y2::Real) = sqrt((y2-y1)^2 + (x2-x1)^2)
-
 # ## break segments with identical vertices in two
 # adds new metavertices and segments to differentiate them
 # like so
@@ -200,14 +224,14 @@ dist(x1::Real, y1::Real, x2::Real, y2::Real) = sqrt((y2-y1)^2 + (x2-x1)^2)
 #      \---/            \-o-/
 function differentiate_duplicates!(
         metavertices::Vector{MetaVertex{T, U}},
-        segments::Vector{Segment{T, V}}; min_pixels
-    ) where {T, U, V}
+        segments::Vector{Segment{T, U}}; loop_threshold
+    ) where {T, U}
 
     # find "duplicate" segments
     duplicates = duplicate_elements(s -> sort(vertices(s)), segments)
     
     # delete segments below pixel length threshold
-    tiny_duplicate_idxs = findall(s -> length(xs(s)) < min_pixels, duplicates)
+    tiny_duplicate_idxs = findall(s -> length(xs(s)) < loop_threshold, duplicates)
     deleteat!(segments, tiny_duplicate_idxs)
     
     # stop if no (more) duplicates
@@ -249,11 +273,12 @@ function differentiate_duplicates!(
 
     # make new segments between startpoint and new midpoint
     seg_new = [
-        Segment{T, V}(
-            id(duplicates[i]), # note: segment ids don't need to be unique
+        Segment{T, U}(
+            maximum(id.(segments)) + i,
+            id(duplicates[i]),
             [vertices(duplicates[i])[1], id(mvs_new[i])],
-            [f(duplicates[i]) for f in [width, pred_primary]]...,
             xs(duplicates[i])[1:(end ÷ 2)], ys(duplicates[i])[1:(end ÷ 2)],
+            [f(duplicates[i]) for f in [width, pred_primary]]...,
             [angles(duplicates[i])[1], new_local_angles[i][2]]
         )
         for i in eachindex(duplicates)
@@ -298,8 +323,8 @@ function duplicate_elements(f::Function, v::Vector)
 end
 
 # ## vertex clustering
-function cluster_vertices!(segments, metavertices; dist_threshold)
-    vertex_clusters = get_vertex_clusters(segments, metavertices, dist_threshold)
+function cluster_vertices!(segments, metavertices; cluster_threshold)
+    vertex_clusters = get_vertex_clusters(segments, metavertices, cluster_threshold)
 
     if isempty(vertex_clusters)
         return nothing
@@ -321,7 +346,7 @@ function cluster_vertices!(segments, metavertices; dist_threshold)
 end
 
 # ### collect vertices that should be clustered
-function get_vertex_clusters(segments::Vector{Segment{T, U}}, metavertices::Vector{<:MetaVertex{T}}, dist_threshold) where {T, U}
+function get_vertex_clusters(segments::Vector{Segment{T, U}}, metavertices::Vector{<:MetaVertex{T}}, cluster_threshold) where {T, U}
     ov_vertices = [vertices(s) for s in segments if length(vertices(s)) != 2] |>
         x -> reduce(vcat, x, init = T[]) |> unique # overconnected vertex ids
 
@@ -333,7 +358,7 @@ function get_vertex_clusters(segments::Vector{Segment{T, U}}, metavertices::Vect
         connected_vertices = vertices.(connected_segments)
 
         for con_vertex in unique(reduce(vcat, connected_vertices))
-            if distance(metavertices[ov_vertex], metavertices[con_vertex]) <= dist_threshold
+            if distance(metavertices[ov_vertex], metavertices[con_vertex]) <= cluster_threshold
                 # connect all vertices that are connected by at least one segment and are really close to the main vertex
                 push!(cluster, con_vertex)
             end
@@ -472,11 +497,13 @@ function get_augmented_coords(id, vertices; augmented_margins)
 end
 
 # # turn into preliminary graph
-function get_pregraph(metavertices::Vector{MetaVertex{T, U}}, segments::Vector{Segment{T, V}}) where {T, U, V}
+function get_pregraph(metavertices::Vector{MetaVertex{T, U}}, segments::Vector{Segment{T, U}}) where {T, U}
     _vertices = id.(metavertices)
     _segments = [s for s in segments if length(vertices(s)) == 2]
     length(segments) != length(_segments) && @info "Segments were found connecting more than 2 vertices. These have been removed."
     _metavertexdict = Dict(Pair.(_vertices, metavertices))
+
+    sort!(segments, by = id)
 
     return PreGraph(_vertices, _segments, _metavertexdict)
 end

@@ -1,8 +1,8 @@
 # read in data from file
 
 function read_data(
-        file::String, id_colname::Symbol;
-        delim::Char = ',', groupdelim::Char = '"', superdelim::Char = ';', missing_string::String = "missing"
+        file::String, id_colname::Symbol; delim::Char = ',', groupdelim::Char = '"',
+        superdelim::Char = ';', missing_string::String = "missing", parse_strings::Bool = true
     )
 
     lines = readlines(file) .|>
@@ -10,7 +10,7 @@ function read_data(
 
     processed_lines = lines .|>
         x -> split_line(x, delim, groupdelim) .|>
-        x -> autoparse(x, delim, superdelim, missing_string)
+        x -> autoparse(x, delim, superdelim, missing_string; parse_strings)
 
     header = processed_lines[1] .|> Symbol
     data = processed_lines[2:end] |> x -> reduce(hcat, x)
@@ -54,11 +54,13 @@ single_strip(s::AbstractString, chars::Vector{Char}) = [
 ] |> x -> *(x...)
 single_strip(s::AbstractString, char::Char) = single_strip(s, [char])
 
-function autoparse(line::AbstractString, delim::Char, superdelim::Char, missing_string::String)
-    # try parsing as number or bool
-    !isnothing(tryparse(Int64, line)) && return parse(Int64, line)
-    !isnothing(tryparse(Float64, line)) && return parse(Float64, line)
-    !isnothing(tryparse(Bool, lowercase(line))) && return parse(Bool, lowercase(line))
+function autoparse(line::AbstractString, delim::Char, superdelim::Char, missing_string::String; parse_strings::Bool)
+    if parse_strings
+        # try parsing as number or bool
+        !isnothing(tryparse(Int64, line)) && return parse(Int64, line)
+        !isnothing(tryparse(Float64, line)) && return parse(Float64, line)
+        !isnothing(tryparse(Bool, lowercase(line))) && return parse(Bool, lowercase(line))
+    end
 
     # parse missing strings
     line == missing_string && return missing
@@ -71,13 +73,17 @@ function autoparse(line::AbstractString, delim::Char, superdelim::Char, missing_
         x -> split.(x, delim) .|>
         x -> strip.(x, [[' ', '(', ')']])
 
-    return [unwrap([autoparse(_le, delim, superdelim, missing_string) for _le in le]) for le in line_elements] |> unwrap
+    return [unwrap([autoparse(_le, delim, superdelim, missing_string; parse_strings) for _le in le]) for le in line_elements] |> unwrap
 end
 
 unwrap(x::AbstractVector) = length(x) == 1 ? unwrap(x[1]) : x
 unwrap(x) = x
 
 function vectorpromote(xs)
+    if any(ismissing.(xs)) && !all(ismissing.(xs))
+        return xs # missing values are allowed to coexist with others
+    end
+
     if any(isa.(xs, Vector))
         xs = wrap.(xs)
     end

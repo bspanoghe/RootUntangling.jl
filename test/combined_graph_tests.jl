@@ -12,7 +12,7 @@ edge_data_dict = Dict(
     3 => Dict(:width => 0.5, :pred_primary => 0.0, :xs => [1, 2], :ys => [1, 2]),
 );
 
-pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
+pg = get_pregraph(edge_data_dict, vertex_data_dict, cluster_threshold = 0.5);
 rg = get_rootgraph(pg);
 
 graphplot(rg)

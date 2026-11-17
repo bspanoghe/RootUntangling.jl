@@ -19,7 +19,7 @@ edge_data_dict = Dict(
     [i => Dict(:width => 1.0, :pred_primary => 0.5, :xs => Int64[], :ys => Int64[]) for i in 1:13]
 );
 
-pg = get_pregraph(edge_data_dict, vertex_data_dict, dist_threshold = 0.5);
+pg = get_pregraph(edge_data_dict, vertex_data_dict, cluster_threshold = 0.5);
 rg = get_rootgraph(pg);
 model = solve_rsa(rg; optimizer = JuMP.optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false), num_roots = 3, max_overlapping = 4, ρₒ = 0.3);
 

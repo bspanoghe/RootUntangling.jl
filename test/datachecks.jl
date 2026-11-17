@@ -28,7 +28,7 @@ for roi_nr in 1:7
         _segments = getsegments(_metavertices, vertex_data_dict, edge_data_dict)
 
         single_vertex_segments = remove_single_vertex_segments!(_segments, debug_output = true)
-        merged_metavertices = cluster_vertices!(_segments, _metavertices, dist_threshold = 3, debug_output = true)
+        merged_metavertices = cluster_vertices!(_segments, _metavertices, cluster_threshold = 3, debug_output = true)
 
         # turn into graph
         g = PreGraph(_metavertices, _segments)
