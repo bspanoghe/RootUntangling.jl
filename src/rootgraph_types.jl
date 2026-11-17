@@ -6,6 +6,7 @@ abstract type AbstractEdge end
 src(ae::AbstractEdge) = ae.src
 dst(ae::AbstractEdge) = ae.dst
 segment_id(ae::AbstractEdge) = ae.segment_id
+og_segment_id(ae::AbstractEdge) = ae.og_segment_id
 vertices(ae::AbstractEdge) = (src(ae), dst(ae))
 is_augmented(ae::AbstractEdge) = any(is_augmented.(vertices(ae)))
 
@@ -25,31 +26,45 @@ struct RootEdge{T, U} <: AbstractEdge
     src::T
     dst::T
     segment_id::T
+    og_segment_id::T
     width::U
     pred_primary::Union{U, Missing} #! only for testing first 7 ROI - remove Missing Union later
     src_angle::U
     dst_angle::U
 
-    function RootEdge(src::T, dst::T, segment_id::T, width::U,
+    function RootEdge(src::T, dst::T, segment_id::T, og_segment_id::T, width::U,
             pred_primary::Union{U, Missing}, src_angle::U, dst_angle::U) where {T, U}
         
         p = sortperm([src, dst])
-        new{T, U}([src, dst][p]..., segment_id, width, pred_primary, [src_angle, dst_angle][p]...)
+        new{T, U}([src, dst][p]..., segment_id, og_segment_id, width, pred_primary, [src_angle, dst_angle][p]...)
     end
 end
-RootEdge(src::T, dst::T) where {T} = RootEdge(src, dst, 0, NaN, NaN, NaN, NaN)
+RootEdge(src::T, dst::T) where {T} = RootEdge(src, dst, 0, 0, NaN, NaN, NaN, NaN)
 function RootEdge(s::Segment)
     p = sortperm(vertices(s)) # permutation vector that sorts indices
     src, dst = vertices(s)[p]
     src_angle, dst_angle = angles(s)[p]
 
-    return RootEdge(src, dst, id(s), width(s), pred_primary(s), src_angle, dst_angle)
+    return RootEdge(src, dst, id(s), og_id(s), width(s), pred_primary(s), src_angle, dst_angle)
 end
 
 width(re::RootEdge) = re.width
 pred_primary(re::RootEdge) = re.pred_primary
 src_angle(re::RootEdge) = re.src_angle
 dst_angle(re::RootEdge) = re.dst_angle
+
+# Like a RootEdge but then directed!
+struct RootArc{T, U} <: AbstractEdge
+    src::T
+    dst::T
+    segment_id::T
+    og_segment_id::T
+    xs::Vector{U}
+    ys::Vector{U}
+end
+xs(ra::RootArc) = ra.xs
+ys(ra::RootArc) = ra.ys
+
 
 # vertices
 """

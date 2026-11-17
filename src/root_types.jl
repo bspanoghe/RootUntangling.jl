@@ -1,26 +1,5 @@
 # # Types
 
-# Like a RootEdge but then directed!
-struct RootArc{T, U} <: AbstractEdge
-    src::T
-    dst::T
-    segment_id::T
-    xs::Vector{U}
-    ys::Vector{U}
-end
-function RootArc(rg::RootGraph, re::RootEdge, s::Segment; keep_order::Bool)
-    source, dest = keep_order ? (src(re), dst(re)) : (dst(re), src(re))
-    is_augmented(re) && return RootArc(source, dest, segment_id(re), xs(s), ys(s))
-    
-    dist_source = distance(x(V(rg, source)), y(V(rg, source)), xs(s)[1], ys(s)[1])
-    dist_dest = distance(x(V(rg, dest)), y(V(rg, dest)), xs(s)[1], ys(s)[1])
-    xs_cor, ys_cor = (dist_source < dist_dest) ? (xs(s), ys(s)) : (reverse(xs(s)), reverse(ys(s)))
-
-    RootArc(source, dest, segment_id(re), xs_cor, ys_cor)
-end
-xs(ra::RootArc) = ra.xs
-ys(ra::RootArc) = ra.ys
-
 struct RootFragment{T, U}
     is_primary::Bool
     edges::Vector{RootArc{T, U}}

@@ -68,6 +68,16 @@ function add_fragment!(rg::RootGraph, fragments::Vector{<:RootFragment}, segment
     return nothing
 end
 
+function RootArc(rg::RootGraph, re::RootEdge, s::Segment; keep_order::Bool)
+    source, dest = keep_order ? (src(re), dst(re)) : (dst(re), src(re))
+    is_augmented(re) && return RootArc(source, dest, segment_id(re), og_segment_id(re), xs(s), ys(s))
+    
+    dist_source = distance(x(V(rg, source)), y(V(rg, source)), xs(s)[1], ys(s)[1])
+    dist_dest = distance(x(V(rg, dest)), y(V(rg, dest)), xs(s)[1], ys(s)[1])
+    xs_cor, ys_cor = (dist_source < dist_dest) ? (xs(s), ys(s)) : (reverse(xs(s)), reverse(ys(s)))
+    return RootArc(source, dest, segment_id(re), og_segment_id(re), xs_cor, ys_cor)
+end
+
 function stitch_fragments!(fragments::Vector{<:RootFragment})
     growing = true
     # keep going until all root fragments cant grow anymore

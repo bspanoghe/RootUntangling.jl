@@ -188,6 +188,7 @@ function differentiate_single_vertex_segments!(
     seg_new = [
         Segment{T, U}(
             maximum(id.(segments)) + i,
+            id(singles[i]),
             [vertices(singles[i])[1], id(mvs_new[i])],
             xs(singles[i])[1:(end ÷ 2)], ys(singles[i])[1:(end ÷ 2)],
             [f(singles[i]) for f in [width, pred_primary]]...,
@@ -274,6 +275,7 @@ function differentiate_duplicates!(
     seg_new = [
         Segment{T, U}(
             maximum(id.(segments)) + i,
+            id(duplicates[i]),
             [vertices(duplicates[i])[1], id(mvs_new[i])],
             xs(duplicates[i])[1:(end ÷ 2)], ys(duplicates[i])[1:(end ÷ 2)],
             [f(duplicates[i]) for f in [width, pred_primary]]...,

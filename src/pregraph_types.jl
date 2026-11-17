@@ -4,6 +4,7 @@ isspecial(v::Integer) = v < 0
 
 mutable struct Segment{T, U}
     id::T
+    og_id::T
     vertices::Vector{T}
     xs::Vector{U}
     ys::Vector{U}
@@ -12,8 +13,10 @@ mutable struct Segment{T, U}
     angles::Vector{U}
 end
 
+Segment(id, vertices, xs, ys, width, pred_primary, angles) = Segment(id, id, vertices, xs, ys, width, pred_primary, angles)
 Segment(id, vertices) = Segment(id, vertices, Float64[], Float64[], NaN, NaN, [NaN, NaN])
 id(s::Segment) = s.id
+og_id(s::Segment) = s.og_id
 vertices(s::Segment) = s.vertices
 width(s::Segment) = s.width
 pred_primary(s::Segment) = s.pred_primary
