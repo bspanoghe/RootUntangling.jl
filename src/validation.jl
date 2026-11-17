@@ -112,11 +112,13 @@ function get_validation_data(filename_GT::String, filename_segments::String, fil
         cluster_threshold, loop_threshold, reverse_y, angle_correction
     )
     
+    # get original (not cleaned) segments
     vertex_data_dict, edge_data_dict = get_data_dicts(filename_segments, filename_vertices; reverse_y, angle_correction)
     metavertices = getmetavertices(vertex_data_dict)
     segments = getsegments(metavertices, vertex_data_dict, edge_data_dict)
     sort_segment_coordinates!(segments, metavertices)
 
+    # get how segments map to roots in the ground truth
     valdata = read_data(filename_GT, :Segment_ID, missing_string = "-", parse_strings = false) |>
         x -> [parse(Int64, key) => x[key] for key in keys(x)] |> Dict
     root_segment_mappings = get_root_segment_mappings(valdata)
@@ -326,8 +328,30 @@ function add_dummy_rootsystems!(vrss::Vector{ValRootSystem{T, U}}, n_diff::Integ
     return nothing
 end
 
-standard_segments(r::Root) = filter(!is_augmented, segment_id.(edges(r)))
-standard_segments(vr::ValRoot) = segment_id.(edges(vr))
+standard_segments(r::Root) = filter(!is_augmented, og_segment_id.(edges(r)))
+standard_segments(vr::ValRoot) = og_segment_id.(edges(vr))
 
 pixels(r::Root) = [(x, y) for (x, y) in zip(xs(r), ys(r))]
 pixels(vr::ValRoot) = [(x, y) for (x, y) in zip(xs(vr), ys(vr))]
+
+function plot_mistakes(rg::RootGraph, rss::Vector{<:RootSystem}, vrss::Vector{<:ValRootSystem}, rs_mapping, root_mappings)
+    rss, vrss = (deepcopy(rss), deepcopy(vrss))
+    for (i, (rs, vrs)) in enumerate(zip(rss, vrss[rs_mapping]))
+        add_dummy_roots!(rs, vrs)
+        laterals(vrs) .= laterals(vrs)[root_mappings[i]];
+    end
+
+    incorrect_segments_ids = [
+        [
+            full_setdiff(standard_segments(laterals(rs)[i]), standard_segments(laterals(vrs)[i]))
+            for i in eachindex(laterals(rs))
+        ] |> x -> reduce(vcat, x)
+        for (rs, vrs) in zip(rss, vrss[rs_mapping])
+    ] |> x -> reduce(vcat, x)
+
+    f = graphplot(rg)
+    for re in filter(re -> re.og_segment_id ∈ incorrect_segments_ids, E₀(rg))
+        lines!(f[1, 1], rg, re, color = :red, linewidth = 10, alpha = 0.3)
+    end
+    return f
+end
