@@ -10,11 +10,11 @@ ENV["JULIA_DEBUG"] = RootUntangling
 
 # choose boy
 playground_dir = "playground"
-difficulty = "easy"
+difficulty = "intermediate"
 validation_dir = "validation/$(difficulty)"
 
 directory = validation_dir
-roi_nr = 1
+roi_nr = 5
 
 # read data
 
@@ -56,7 +56,7 @@ begin
     f_multi
 end
 
-subidx = 2
+subidx = 4
 rg = rgs[subidx]
 graphplot(rg, augmented_alpha = 0.01)
 
@@ -80,20 +80,6 @@ rss = greedy_switch(rss_raw, f_obj = weighted_tortuosity);
 
 r1 = rootplot(rss_raw, size = (600, 600), title = "Weighted tortuosity: $(weighted_tortuosity(rss_raw))")
 r2 = rootplot(rss, size = (600, 600), title = "Weighted tortuosity: $(weighted_tortuosity(rss))")
-# save(homedir() * "/Downloads/test1.svg", r1)
-# save(homedir() * "/Downloads/test2.svg", r2)
-
-# ap = annotation_plot(rg_full, size = (2000, 4000));
-# save(homedir() * "/Downloads/thefuckingmimeryyysoto.svg", ap)
-# ap = annotation_plot(rg, size = (2000, 4000));
-# save(homedir() * "/Downloads/thefuckingmimeryyy.svg", ap)
-# f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1200, 1500), vertex_kwargs = Dict(:markersize => 2))
-# save(homedir() * "/Downloads/woagh.svg", f_g)
-# r1 = rootplot(rss, size = (1200, 1500), title = "Weighted tortuosity: $(weighted_tortuosity(rss))")
-# save(homedir() * "/Downloads/aghwuuu.svg", r1)
-
-
-
 
 # validation
 
@@ -110,12 +96,12 @@ vrss, segmentation_errors = get_validation_data(filename_GT, filename_segments, 
 );
 rootplot(vrss)
 
-metric = standard_segments
+metric = pixels
 rs_mapping, root_mappings = get_optimal_mappings(rss, vrss, metric, optimizer = HiGHS.Optimizer)
 
 🔴(x) = round(Int64, x)
 open("test.txt", "w") do file
-    write(file, "class, roi, nr, type, PR_length, LR_count, LR_lengths")
+    write(file, "class, roi, nr, type, PR_length, LR_count, LR_lengths, segmentation_error")
 end
 
 figures = Makie.Figure[]
@@ -127,7 +113,8 @@ for (i, rs) in enumerate(rss)
             file,
             "\n$(difficulty), $(roi_nr), $i, GT, $(🔴(curve_length(primary(vrs)))), " *
                 "$(🔴(length(laterals(vrs)))), " *
-                "\"" * "$(🔴.(curve_length.(laterals(vrs))))"[2:end-1] * "\""
+                "\"" * "$(sort(🔴.(curve_length.(laterals(vrs))), rev = true))"[2:end-1] * "\"" *
+                ", $(segmentation_errors[i])"
         )
     end
 
@@ -136,7 +123,8 @@ for (i, rs) in enumerate(rss)
             file,
             "\n$(difficulty), $(roi_nr), $i, predicted, $(🔴(curve_length(primary(rs)))), " *
                 "$(🔴(length(laterals(rs)))), " *
-                "\"" * "$(🔴.(curve_length.(laterals(rs))))"[2:end-1] * "\""
+                "\"" * "$(sort(🔴.(curve_length.(laterals(rs))), rev = true))"[2:end-1] * "\"" *
+                ", $(segmentation_errors[i])"
         )
     end
 
@@ -154,15 +142,15 @@ for (i, rs) in enumerate(rss)
 end
 
 figures[1]
-rss[1]
-vrss[3]
 
-rootplot(rs_copy)
-rootplot(vrs_copy)
+plot_mistakes(rg, rss, vrss, rs_mapping, root_mappings)
 
-import RootUntangling: full_setdiff
 
-[
-    full_setdiff(standard_segments(laterals(rs_copy)[i]), standard_segments(laterals(vrs_copy)[i]))
-    for i in eachindex(laterals(rs_copy))
-]
+# ap = annotation_plot(rg_full, size = (2000, 4000));
+# save(homedir() * "/Downloads/thefuckingmimeryyysoto.svg", ap)
+# ap = annotation_plot(rg, size = (2000, 4000));
+# save(homedir() * "/Downloads/thefuckingmimeryyy.svg", ap)
+# f_g = graphplot(rg, model, augmented_alpha = 0.3, size = (1200, 1500), vertex_kwargs = Dict(:markersize => 2))
+# save(homedir() * "/Downloads/woagh.svg", f_g)
+# r1 = rootplot(rss, size = (1200, 1500), title = "Weighted tortuosity: $(weighted_tortuosity(rss))")
+# save(homedir() * "/Downloads/aghwuuu.svg", r1)
