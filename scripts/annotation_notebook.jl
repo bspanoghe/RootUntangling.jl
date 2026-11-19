@@ -41,11 +41,21 @@ md"## Data reading"
 
 # ╔═╡ 72b6f5ea-f063-4705-bc9c-b06d55fd0d43
 begin
-    nₕ_min = 1
-    pₛ = 0.2
     cluster_threshold = 3
+    loop_threshold = 5
     reverse_y = true
+    angle_correction = -
 end;
+
+# ╔═╡ 0bce83d3-e008-45d0-b32c-0b08c9b6711b
+md"### Rootsystem selection"
+
+# ╔═╡ 8d59a0ee-4f91-48b7-993c-20e799c957ce
+begin
+    min_vertices = 20
+    y_min = -1000
+    y_max = 4800
+end
 
 # ╔═╡ 3fc9f8b8-e6e8-4409-a920-98d30ac9c2d1
 md"## Data visualisation"
@@ -55,13 +65,39 @@ md"## Data visualisation"
 
 # ╔═╡ c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
 begin
-    filename_segments = "../data/ROI_$(roi_nr)/segment_info_with_coords.csv"
-    filename_vertices = "../data/ROI_$(roi_nr)/bp1_segments_grouped.csv"
-    rg = get_rootgraph(filename_segments, filename_vertices; cluster_threshold, reverse_y, pₛ, nₕ_min)
+    filename_segments = "../data/playground/ROI_$(roi_nr)/segment_info_with_coords.csv"
+    filename_vertices = "../data/playground/ROI_$(roi_nr)/bp1_segments_grouped.csv"
+    pg = get_pregraph(filename_segments, filename_vertices; cluster_threshold, loop_threshold, reverse_y, angle_correction)
+    rg_full = get_rootgraph(pg)
 end
 
+# ╔═╡ 792c91d6-4863-4165-b926-c8b0769a0481
+begin
+    rgs = get_subgraphs(rg_full) |>
+        rgs -> filter(rg -> length(rg) > min_vertices, rgs) |>
+        rgs -> filter(rg -> minimum(y.(V₀(rg))) >= y_min && maximum(y.(V₀(rg))) <= y_max, rgs) |>
+        rgs -> sort(rgs, by = rg -> mean(x.(V₀(rg))));
+    
+    f_multi = Figure()
+    ax_multi = Axis(f_multi[1, 1]; aspect = DataAspect())
+    
+    ls = [
+        lines!(ax_multi, rg, E₀(rg), color = Makie.HSV(i / length(rgs) * 360, 1, 1))
+        for (i, rg) in enumerate(rgs)
+    ]
+    Legend(f_multi[1, 2], ls, string.(1:length(ls)))
+
+    f_multi
+end
+
+# ╔═╡ d86ed7ae-877e-42e8-a748-109e92daab38
+@bind subidx Select(1:length(rgs), default = 1)
+
 # ╔═╡ 3f40ee53-68ad-4bfa-a784-bbad4a366f02
-hypothesis_plot(rg)
+begin
+	rg = rgs[subidx]
+	graphplot(rg, augmented_alpha = 0.01)
+end
 
 # ╔═╡ 7894d17f-b98c-4e19-8d3b-4fb690aaeb42
 md"## Solving"
@@ -69,24 +105,39 @@ md"## Solving"
 # ╔═╡ 990ad7fb-4256-41ce-a6fe-520a103c5ea7
 begin
 	time_limit = 60
-	hotstart_time = 60
 	num_roots = 1
+	max_overlapping = 5
 end;
 
 # ╔═╡ 5355a78b-3bee-454e-a18b-0e6ac2d202b7
 # ╠═╡ show_logs = false
-model, time = @timed solve_rsa(
-    rg; optimizer = Gurobi.Optimizer, time_limit, hotstart_time, num_roots
-);
+begin
+    model, time = @timed solve_rsa(
+        rg; optimizer = Gurobi.Optimizer, time_limit, num_roots, max_overlapping
+    );
+    rss_raw = get_rootsystems(rg, pg, model);
+    rss = greedy_switch(rss_raw, f_obj = weighted_tortuosity);
+end;
 
-# ╔═╡ 797a5241-5c5c-47f9-a79c-c1ceec3add21
-roots = get_rootsystems(rg, model);
+# ╔═╡ 20ffd4b3-481b-4e7b-83d2-7be41bd497f4
+begin
+	f_root = Figure()
+	RootUntangling.rootplot!(
+		Axis(f_root[1, 1], aspect = DataAspect()), rss_raw, size = (600, 600), 
+		title = "Weighted tortuosity: $(weighted_tortuosity(rss_raw))"
+	)
+	RootUntangling.rootplot!(
+		Axis(f_root[1, 2], aspect = DataAspect()), rss, size = (600, 600),
+		title = "Weighted tortuosity: $(weighted_tortuosity(rss_raw))"
+	)
+	f_root
+end
 
-# ╔═╡ 3ab99e7a-2e94-486c-8f25-6ca8aaad21b9
-r = rootplot(roots, title = "Time: $(round(time / 60, digits = 1)) min")
+# ╔═╡ 00312cba-17c3-4bf7-acf2-e637a99c710e
+md"## Annotation"
 
 # ╔═╡ 95fce8b3-1db5-4a61-b4e3-0e8e36181416
-annotation_dict = RootUntangling.get_annotation_dict(rg, roots);
+annotation_dict = RootUntangling.get_annotation_dict(rgs, rss);
 
 # ╔═╡ 08de3104-630e-4792-836f-0ab11d324470
 @bind working_on Select(
@@ -137,14 +188,18 @@ end
 # ╟─71e10643-4c1d-4069-bd9e-eb8fd58dccc7
 # ╠═72b6f5ea-f063-4705-bc9c-b06d55fd0d43
 # ╠═c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
+# ╟─0bce83d3-e008-45d0-b32c-0b08c9b6711b
+# ╠═8d59a0ee-4f91-48b7-993c-20e799c957ce
+# ╠═792c91d6-4863-4165-b926-c8b0769a0481
 # ╟─3fc9f8b8-e6e8-4409-a920-98d30ac9c2d1
 # ╠═690ea173-af44-475e-bc5a-1f1044e48309
-# ╠═3f40ee53-68ad-4bfa-a784-bbad4a366f02
+# ╠═d86ed7ae-877e-42e8-a748-109e92daab38
+# ╟─3f40ee53-68ad-4bfa-a784-bbad4a366f02
 # ╟─7894d17f-b98c-4e19-8d3b-4fb690aaeb42
 # ╠═990ad7fb-4256-41ce-a6fe-520a103c5ea7
-# ╠═5355a78b-3bee-454e-a18b-0e6ac2d202b7
-# ╠═797a5241-5c5c-47f9-a79c-c1ceec3add21
-# ╠═3ab99e7a-2e94-486c-8f25-6ca8aaad21b9
+# ╟─5355a78b-3bee-454e-a18b-0e6ac2d202b7
+# ╟─20ffd4b3-481b-4e7b-83d2-7be41bd497f4
+# ╟─00312cba-17c3-4bf7-acf2-e637a99c710e
 # ╠═95fce8b3-1db5-4a61-b4e3-0e8e36181416
 # ╟─08de3104-630e-4792-836f-0ab11d324470
 # ╟─d9658eec-968d-44d1-bbb7-21717e4a4bfd
