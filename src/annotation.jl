@@ -2,7 +2,7 @@ function write_annotation(filename::String, rg_full::RootGraph,
         rgs::Vector{<:RootGraph}, root_clusters::Vector{<:Vector{<:RootSystem}}
     )
     io = open(filename, "w")
-    write(io, "Segment_ID,root_ids\n")
+    write(io, "Segment_ID,root_ids,real_length\n")
 
     annotation_dict = get_annotation_dict(rgs, root_clusters)
     segment_ids = segment_id.(E₀(rg_full))
@@ -13,7 +13,7 @@ function write_annotation(filename::String, rg_full::RootGraph,
         root_id_string = isempty(root_ids) ? "-" :
             *([get_string_id(id) * ";" for id in root_ids]...)[1:end-1] # remove trailing `,`
         segment_id_string = get_string_id(segment_id)
-        write(io, segment_id_string * "," * root_id_string * "\n")
+        write(io, segment_id_string * "," * root_id_string * ",\n")
     end
     close(io)
 end
