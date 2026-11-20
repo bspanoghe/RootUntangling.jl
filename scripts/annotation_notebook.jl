@@ -31,7 +31,7 @@ begin
 	using RootUntangling
 	using WGLMakie
 	using JuMP, HiGHS
-	import .Makie.HSV, RootUntangling.mean
+	import .Makie.HSV, .Makie.HSVA, RootUntangling.mean
 end
 
 # ╔═╡ 1423c220-fb6d-4c4c-bd07-140e29cc79cc
@@ -163,6 +163,7 @@ function set_colors!(edge_color_dict::Dict, annotation_dict::Dict,
 		rg::RootGraph, root_nums::Vector
 	)
 	for re in E₀(rg)
+		haskey(annotation_dict, segment_id(re)) || continue
 		colors = [
 			root_color(root_idx, root_nums[rs_idx])
 			for (rs_idx, root_idx) in annotation_dict[segment_id(re)]
@@ -178,13 +179,17 @@ function set_colors!(edge_color_dict::Dict, annotation_dict::Dict,
 end
 
 # ╔═╡ 1de98531-6b6a-4443-8fb7-793509730fe8
-function set_annotations!(edge_annotation_dict::Dict, annotation_dict::Dict, 
+function set_annotations!(annotations::Observable, annotation_dict::Dict, 
 		rg::RootGraph
 	)
-	for re in E₀(rg)
-		ann = annotation_dict[segment_id(re)]
-		edge_annotation_dict[re][] = isempty(ann) ? "[]" : string(ann)
-	end
+	
+	annotations[] = [
+		string(
+			get(annotation_dict, segment_id(re), "[]") |>
+				x -> isempty(x) ? "[]" : x
+		)
+		for re in E₀(rg)
+	]
 
 	return nothing
 end
@@ -196,30 +201,29 @@ end
 
 # ╔═╡ 2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 begin    
-    f = Figure(; size = (500, 1000))
+    f = Figure(; size = (800, 800))
     ax = Axis(f[1, 1]; aspect = DataAspect())
 
     edge_color_dict = [
-        re => Observable(HSV(0, 1, 0))
-        for re in E₀(rg)
+        re => Observable(HSVA(0, 0, 0, 0))
+        for re in E₀(rg_full)
     ] |> Dict
 
-    edge_annotation_dict = [
-        re => Observable("")
-        for re in E₀(rg)
-    ] |> Dict
+    annotations = [
+        ""
+        for re in E₀(rg_full)
+    ] |> Observable
 
-    for re in E₀(rg)
-        lines!(ax, rg, re; color = edge_color_dict[re], linestyle = :solid)
-        annotation!(
-            f.content[1], (mean(xs(rg, re)), mean(ys(rg, re))); 
-            text = edge_annotation_dict[re], color = :black, 
-            shrink = (0, 0), fontsize = 8
-        )
+    for re in E₀(rg_full)
+        lines!(ax, rg_full, re; color = edge_color_dict[re], linestyle = :solid)
     end
 
-    set_colors!(edge_color_dict, annotation_dict, rg, root_nums)
-    set_annotations!(edge_annotation_dict, annotation_dict, rg)
+    x_coords = [mean(xs(rg_full, re)) for re in E₀(rg_full)]
+    y_coords = [mean(ys(rg_full, re)) for re in E₀(rg_full)]
+    text!(ax, x_coords, y_coords; text = annotations, fontsize = 8)
+
+    set_colors!(edge_color_dict, annotation_dict, rg_full, root_nums)
+    set_annotations!(annotations, annotation_dict, rg_full)
 
     on(events(f).mousebutton, priority = 2) do event
         if event.button == Mouse.left && event.action == Mouse.press
@@ -240,8 +244,8 @@ begin
                 else
                     deleteat!(annotation_dict[s_id], current_annotation_idx)
                 end
-                set_colors!(edge_color_dict, annotation_dict, rg, root_nums)
-                set_annotations!(edge_annotation_dict, annotation_dict, rg)
+                set_colors!(edge_color_dict, annotation_dict, rg_full, root_nums)
+                set_annotations!(annotations, annotation_dict, rg_full)
             end
         end
     end
@@ -256,7 +260,7 @@ annotation_dict
 
 # ╔═╡ 78a5a17f-8064-437f-bdf5-6ac47fe0741c
 if done > 0
-    write_annotation(homedir() * "/Downloads/test_$(roi_nr).txt", rg_full, rgs, root_clusters)
+    write_annotation(homedir() * "/Downloads/test_$(roi_nr).txt", rg_full, annotation_dict)
 end
 
 # ╔═╡ Cell order:
@@ -284,9 +288,9 @@ end
 # ╟─17648059-dcb1-400a-bc89-1a5bb734ee03
 # ╟─ff4f7aee-13c6-49c2-837d-12a3e741c28c
 # ╟─16b156b2-a73b-424c-b271-9e15994c4d2f
-# ╟─1de98531-6b6a-4443-8fb7-793509730fe8
+# ╠═1de98531-6b6a-4443-8fb7-793509730fe8
 # ╟─08de3104-630e-4792-836f-0ab11d324470
 # ╠═2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 # ╠═9b60de2c-19e6-40ca-b4b0-bc60b19f3adb
 # ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
-# ╟─78a5a17f-8064-437f-bdf5-6ac47fe0741c
+# ╠═78a5a17f-8064-437f-bdf5-6ac47fe0741c
