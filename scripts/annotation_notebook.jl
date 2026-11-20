@@ -22,7 +22,7 @@ using Pkg
 # ╔═╡ 7d5639a6-a788-4877-8ac8-394ffb45a220
 begin
 	Pkg.activate()
-	using PlutoUI; TableOfContents()
+	using Revise, PlutoUI; TableOfContents()
 end
 
 # ╔═╡ 1ebe1d3c-dd67-44d5-b292-c6ce4b9f9aa1
@@ -30,7 +30,8 @@ begin
 	Pkg.activate(".")
 	using RootUntangling
 	using WGLMakie
-	using JuMP, Gurobi
+	using JuMP, HiGHS
+	import .Makie.HSV, RootUntangling.mean
 end
 
 # ╔═╡ 1423c220-fb6d-4c4c-bd07-140e29cc79cc
@@ -113,7 +114,7 @@ end;
 # ╠═╡ show_logs = false
 begin
     model, time = @timed solve_rsa(
-        rg; optimizer = Gurobi.Optimizer, time_limit, num_roots, max_overlapping
+        rg; optimizer = HiGHS.Optimizer, time_limit, num_roots, max_overlapping
     );
     rss_raw = get_rootsystems(rg, pg, model);
     rss = greedy_switch(rss_raw, f_obj = weighted_tortuosity);
@@ -136,48 +137,126 @@ end
 # ╔═╡ 00312cba-17c3-4bf7-acf2-e637a99c710e
 md"## Annotation"
 
+# ╔═╡ f7d8603d-9939-4b79-bc1b-27a3fc311234
+# ╠═╡ show_logs = false
+root_clusters = RootUntangling.get_root_clusters(rgs, pg, [1, 1]; optimizer = HiGHS.Optimizer, time_limit = 60);
+
 # ╔═╡ 95fce8b3-1db5-4a61-b4e3-0e8e36181416
-annotation_dict = RootUntangling.get_annotation_dict(rgs, rss);
+annotation_dict = RootUntangling.get_annotation_dict(rgs, root_clusters);
+
+# ╔═╡ 17648059-dcb1-400a-bc89-1a5bb734ee03
+root_nums = [
+    length(unique(last.(filter(k -> k[1] == i, reduce(vcat, values(annotation_dict))))))
+    for i in sort(unique(first.(reduce(vcat, values(annotation_dict)))))
+]
+
+# ╔═╡ ff4f7aee-13c6-49c2-837d-12a3e741c28c
+root_color(root_idx, num_roots) = (
+    root_idx == 1 ? HSV(0, 1, 0) : (
+        num_roots == 1 ? HSV(0, 1, 0.75) : 
+            HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75)
+    )
+)
+
+# ╔═╡ 16b156b2-a73b-424c-b271-9e15994c4d2f
+function set_colors!(edge_color_dict::Dict, annotation_dict::Dict, 
+		rg::RootGraph, root_nums::Vector
+	)
+	for re in E₀(rg)
+		colors = [
+			root_color(root_idx, root_nums[rs_idx])
+			for (rs_idx, root_idx) in annotation_dict[segment_id(re)]
+		]
+		if !isempty(colors)
+			edge_color_dict[re][] = Makie.weighted_color_mean(ones(length(colors))/length(colors), colors)
+		else
+			edge_color_dict[re][] = HSV(0, 0, 0.5)
+		end
+	end
+
+	return nothing
+end
+
+# ╔═╡ 1de98531-6b6a-4443-8fb7-793509730fe8
+function set_annotations!(edge_annotation_dict::Dict, annotation_dict::Dict, 
+		rg::RootGraph
+	)
+	for re in E₀(rg)
+		ann = annotation_dict[segment_id(re)]
+		edge_annotation_dict[re][] = isempty(ann) ? "[]" : string(ann)
+	end
+
+	return nothing
+end
 
 # ╔═╡ 08de3104-630e-4792-836f-0ab11d324470
 @bind working_on Select(
 	sort(unique(reduce(vcat, values(annotation_dict))))
 )
 
-# ╔═╡ d9658eec-968d-44d1-bbb7-21717e4a4bfd
-@bind clicked CounterButton("Update")
-
 # ╔═╡ 2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
-begin
-    clicked
-    f = RootUntangling.annotation_plot(rg, annotation_dict)
-    ax = Axis(f[1, 1])
+begin    
+    f = Figure(; size = (500, 1000))
+    ax = Axis(f[1, 1]; aspect = DataAspect())
 
-    if !@isdefined annotation_dict_updated
-        annotation_dict_updated = annotation_dict
+    edge_color_dict = [
+        re => Observable(HSV(0, 1, 0))
+        for re in E₀(rg)
+    ] |> Dict
+
+    edge_annotation_dict = [
+        re => Observable("")
+        for re in E₀(rg)
+    ] |> Dict
+
+    for re in E₀(rg)
+        lines!(ax, rg, re; color = edge_color_dict[re], linestyle = :solid)
+        annotation!(
+            f.content[1], (mean(xs(rg, re)), mean(ys(rg, re))); 
+            text = edge_annotation_dict[re], color = :black, 
+            shrink = (0, 0), fontsize = 8
+        )
     end
+
+    set_colors!(edge_color_dict, annotation_dict, rg, root_nums)
+    set_annotations!(edge_annotation_dict, annotation_dict, rg)
 
     on(events(f).mousebutton, priority = 2) do event
         if event.button == Mouse.left && event.action == Mouse.press
             elements = Makie.pick_sorted(f.scene, events(f).mouseposition[], 30)
-            filter!(x -> x[1] isa Lines, elements)
             line_idx = findfirst(x -> x[1] isa Lines, elements)
             if !isnothing(line_idx)
                 line_element = elements[line_idx]
                 re_picked = line_element[1].arg2.value[]
+                
+                s_id = segment_id(re_picked)
 
                 current_annotation_idx = findfirst(
-                    x -> x == working_on, annotation_dict[re_picked]
+                    x -> x == working_on, annotation_dict[s_id]
                 )
+
                 if isnothing(current_annotation_idx)
-                    annotation_dict_updated = push!(annotation_dict[re_picked], working_on)
+                    push!(annotation_dict[s_id], working_on)
                 else
-                    annotation_dict_updated = deleteat!(annotation_dict[re_picked], current_annotation_idx)
+                    deleteat!(annotation_dict[s_id], current_annotation_idx)
                 end
+                set_colors!(edge_color_dict, annotation_dict, rg, root_nums)
+                set_annotations!(edge_annotation_dict, annotation_dict, rg)
             end
         end
     end
     f
+end
+
+# ╔═╡ 9b60de2c-19e6-40ca-b4b0-bc60b19f3adb
+annotation_dict
+
+# ╔═╡ c9f608c8-0088-4667-909e-2ed0cc0d1866
+@bind done CounterButton()
+
+# ╔═╡ 78a5a17f-8064-437f-bdf5-6ac47fe0741c
+if done > 0
+    write_annotation(homedir() * "/Downloads/test_$(roi_nr).txt", rg_full, rgs, root_clusters)
 end
 
 # ╔═╡ Cell order:
@@ -200,7 +279,14 @@ end
 # ╟─5355a78b-3bee-454e-a18b-0e6ac2d202b7
 # ╟─20ffd4b3-481b-4e7b-83d2-7be41bd497f4
 # ╟─00312cba-17c3-4bf7-acf2-e637a99c710e
+# ╠═f7d8603d-9939-4b79-bc1b-27a3fc311234
 # ╠═95fce8b3-1db5-4a61-b4e3-0e8e36181416
+# ╟─17648059-dcb1-400a-bc89-1a5bb734ee03
+# ╟─ff4f7aee-13c6-49c2-837d-12a3e741c28c
+# ╟─16b156b2-a73b-424c-b271-9e15994c4d2f
+# ╟─1de98531-6b6a-4443-8fb7-793509730fe8
 # ╟─08de3104-630e-4792-836f-0ab11d324470
-# ╟─d9658eec-968d-44d1-bbb7-21717e4a4bfd
-# ╟─2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
+# ╠═2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
+# ╠═9b60de2c-19e6-40ca-b4b0-bc60b19f3adb
+# ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
+# ╟─78a5a17f-8064-437f-bdf5-6ac47fe0741c
