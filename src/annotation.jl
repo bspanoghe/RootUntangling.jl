@@ -1,10 +1,7 @@
-function write_annotation(filename::String, rg_full::RootGraph,
-        rgs::Vector{<:RootGraph}, root_clusters::Vector{<:Vector{<:RootSystem}}
-    )
+function write_annotation(filename::String, rg_full::RootGraph, annotation_dict::Dict)
     io = open(filename, "w")
     write(io, "Segment_ID,root_ids,real_length\n")
 
-    annotation_dict = get_annotation_dict(rgs, root_clusters)
     segment_ids = segment_id.(E₀(rg_full))
     sort!(segment_ids)
 
