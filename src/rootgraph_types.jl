@@ -11,7 +11,7 @@ vertices(ae::AbstractEdge) = (src(ae), dst(ae))
 is_augmented(ae::AbstractEdge) = any(is_augmented.(vertices(ae)))
 
 Base.sort(aes::Vector{<:AbstractEdge}) = sort(aes, by = vertices)
-Base.:(==)(ae1::AbstractEdge, ae2::AbstractEdge) = vertices(ae1) == vertices(ae2)
+Base.:(==)(ae1::AbstractEdge, ae2::AbstractEdge) = issetequal(vertices(ae1), vertices(ae2))
 Base.unique(aes::Vector{<:AbstractEdge}) = unique(x -> vertices(x), aes) # doesn't automatically use my equality operator :(
 Base.unique!(aes::Vector{<:AbstractEdge}) = unique!(x -> vertices(x), aes) # sad times
 Base.show(io::IO, ae::AbstractEdge) = print(io, "$(typeof(ae).name.name)$(vertices(ae))")
