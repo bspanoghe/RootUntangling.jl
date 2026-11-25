@@ -74,7 +74,7 @@ end
 
 # ### With annotation classification
 function annotation_plot(rg::RootGraph; size = (500, 1000), fontsize = 8, e_color = :red,
-        v_color = :green, arrow_scaling::Real = 20, edge_kwargs::Dict = Dict(), kwargs...
+        v_color = :green, arrow_scaling::Real = 20, use_plain_text::Bool = false, edge_kwargs::Dict = Dict(), kwargs...
     )
     f = Figure(; size)
     ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
@@ -98,11 +98,16 @@ function annotation_plot(rg::RootGraph; size = (500, 1000), fontsize = 8, e_colo
 
     annotation_coords = [(mean(xs(rg, re)), mean(ys(rg, re))) for re in E₀(rg)]
     annotation_texts = [string(segment_id(re)) for re in E₀(rg)]
-    annotation!(ax, annotation_coords; text = annotation_texts, shrink = (0, 0), color = e_color, fontsize)
-
+    
     vertex_coords = [(x(rv), y(rv)) for rv in V₀(rg)]
     vertex_texts = string.(id.(V₀(rg)))
-    annotation!(ax, vertex_coords; text = vertex_texts, color = v_color, shrink = (0, 0), fontsize)
+    if use_plain_text
+        text!(ax, annotation_coords; text = annotation_texts, color = e_color, fontsize)
+        text!(ax, vertex_coords; text = vertex_texts, color = v_color, fontsize)
+    else
+        annotation!(ax, annotation_coords; text = annotation_texts, shrink = (0, 0), color = e_color, fontsize)
+        annotation!(ax, vertex_coords; text = vertex_texts, color = v_color, shrink = (0, 0), fontsize)
+    end
 
     return f
 end
