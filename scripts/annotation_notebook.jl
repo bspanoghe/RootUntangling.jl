@@ -30,7 +30,7 @@ begin
 	Pkg.activate(".")
 	using RootUntangling
 	using WGLMakie
-	using JuMP, HiGHS
+	using JuMP, HiGHS, Gurobi
 	import .Makie.HSV, .Makie.HSVA, RootUntangling.mean
 end
 
@@ -48,26 +48,143 @@ begin
     angle_correction = -
 end;
 
-# ╔═╡ 0bce83d3-e008-45d0-b32c-0b08c9b6711b
-md"### Rootsystem selection"
+# ╔═╡ 9bedbeba-0a6c-447c-ae17-0cec8e95d23c
+@bind dirname Select(["playground", "validation", "calibration"])
+
+# ╔═╡ 079900fc-3ce2-4b67-9de1-3f2654523eff
+if dirname == "validation"
+	@bind difficulty Select(["baby", "easy", "intermediate", "tough", "ungodly"])
+end
 
 # ╔═╡ 8d59a0ee-4f91-48b7-993c-20e799c957ce
 begin
-    min_vertices = 20
+    min_vertices = 10
     y_min = -1000
-    y_max = 4800
+    y_max = 5000
 end
 
-# ╔═╡ 3fc9f8b8-e6e8-4409-a920-98d30ac9c2d1
-md"## Data visualisation"
+# ╔═╡ 00312cba-17c3-4bf7-acf2-e637a99c710e
+md"## Annotation"
+
+# ╔═╡ d16d027b-f57b-4d91-bafd-4ea0d14241f6
+@bindname from_scratch Switch()
+
+# ╔═╡ fee7a9e4-481e-40c9-9ffc-fa12fcf1b12b
+if !from_scratch
+	@bindname load_corrected Switch()
+end
+
+# ╔═╡ af73fbe5-f5ba-494e-a82a-7391eab778c0
+if from_scratch
+	@bind go CounterButton("Run model")
+end
+
+# ╔═╡ c9f608c8-0088-4667-909e-2ed0cc0d1866
+@bind done CounterButton("Save annotation")
+
+# ╔═╡ 150e2c5e-9828-4180-98b1-cb027d76cba6
+md"## Source"
+
+# ╔═╡ 92477ec2-047e-4d6b-971a-9985662de553
+function get_ROIs(dir::String)
+	names = readdir("../data/$(dir)")
+	filter!(name -> occursin("ROI", name), names)
+	return parse.(Int64, last.(split.(names, '_')))
+end
+
+# ╔═╡ 6c3bd7e0-1d81-46e0-935d-4f6ec23a55a2
+function input_cluster_root_counts(rgs::Vector{<:RootGraph})
+	return PlutoUI.combine() do Child
+		
+		inputs = [
+			md"""Cluster $(i): $(
+				Child(NumberField(default = 1))
+			)"""
+			
+			for i in eachindex(rgs)
+		]
+		
+		md"""
+		#### Root counts per cluster
+		$(inputs)
+		"""
+	end
+end
+
+# ╔═╡ ff4f7aee-13c6-49c2-837d-12a3e741c28c
+# root_color(root_idx, num_roots) = (
+#     root_idx == 1 ? HSV(0, 1, 0) : (
+#         num_roots == 1 ? HSV(0, 1, 0.75) : 
+#             HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75)
+#     )
+# )
+root_color(root_idx, num_roots) = (
+    root_idx == 1 ? HSV(0, 1, 0) : 
+    num_roots == 1 ? HSV(0, 1, 0.75) : 
+    root_idx <= num_roots ? HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75) : HSV(0, 1, 1)
+) #!
+
+# ╔═╡ 16b156b2-a73b-424c-b271-9e15994c4d2f
+function set_colors!(edge_color_dict::Dict, annotation_dict::Dict, 
+		rg::RootGraph, root_nums::Vector
+	)
+	for re in E₀(rg)
+		haskey(annotation_dict, re.og_segment_id) || continue
+		colors = [
+			root_color(root_idx, root_nums[rs_idx])
+			for (rs_idx, root_idx) in annotation_dict[re.og_segment_id]
+		]
+		if !isempty(colors)
+			edge_color_dict[re][] = Makie.weighted_color_mean(ones(length(colors))/length(colors), colors)
+		else
+			edge_color_dict[re][] = HSV(0, 0, 0.5)
+		end
+	end
+
+	return nothing
+end
+
+# ╔═╡ 1de98531-6b6a-4443-8fb7-793509730fe8
+function set_annotations!(annotations::Observable, annotation_dict::Dict, 
+		rg::RootGraph
+	)
+	
+	annotations[] = [
+		string(
+			get(annotation_dict, re.og_segment_id, "[]") |>
+				x -> isempty(x) ? "[]" : x
+		)
+		for re in E₀(rg)
+	]
+
+	return nothing
+end
+
+# ╔═╡ 7f2bd2eb-83d1-495e-b4bf-226beca9f733
+function get_segment_id(f::Makie.Figure)
+	elements = Makie.pick_sorted(f.scene, events(f).mouseposition[], 30)
+    line_idx = findfirst(x -> x[1] isa Lines, elements)
+    isnothing(line_idx) && return nothing
+    
+    line_element = elements[line_idx]
+    re_picked = line_element[1].arg2.value[]
+    return re_picked.og_segment_id
+end
+
+# ╔═╡ 75f65731-fcd7-4d60-baee-3b26f9a3a95d
+if @isdefined difficulty
+	dir = dirname * '/' * difficulty
+else
+	dir = dirname
+end
 
 # ╔═╡ 690ea173-af44-475e-bc5a-1f1044e48309
-@bind roi_nr Select(1:7, default = 4)
+@bind roi_nr Select(get_ROIs(dir))
 
 # ╔═╡ c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
 begin
-    filename_segments = "../data/playground/ROI_$(roi_nr)/segment_info_with_coords.csv"
-    filename_vertices = "../data/playground/ROI_$(roi_nr)/bp1_segments_grouped.csv"
+    filename_segments = "../data/$(dir)/ROI_$(roi_nr)/segment_info_with_coords.csv"
+    filename_vertices = "../data/$(dir)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
     pg = get_pregraph(filename_segments, filename_vertices; cluster_threshold, loop_threshold, reverse_y, angle_correction)
     rg_full = get_rootgraph(pg)
 end
@@ -91,121 +208,54 @@ begin
     f_multi
 end
 
-# ╔═╡ d86ed7ae-877e-42e8-a748-109e92daab38
-@bind subidx Select(1:length(rgs), default = 1)
-
-# ╔═╡ 3f40ee53-68ad-4bfa-a784-bbad4a366f02
-begin
-	rg = rgs[subidx]
-	graphplot(rg, augmented_alpha = 0.01)
+# ╔═╡ 2676da59-c62a-4595-9d05-7a36389a0196
+if from_scratch
+	@bind cluster_root_counts_input input_cluster_root_counts(rgs)
 end
 
-# ╔═╡ 7894d17f-b98c-4e19-8d3b-4fb690aaeb42
-md"## Solving"
-
-# ╔═╡ 990ad7fb-4256-41ce-a6fe-520a103c5ea7
-begin
-	time_limit = 60
-	num_roots = 1
-	max_overlapping = 5
-end;
-
-# ╔═╡ 5355a78b-3bee-454e-a18b-0e6ac2d202b7
+# ╔═╡ 0a1e3cc5-d1bb-4049-b4a3-79b05e46bcd4
 # ╠═╡ show_logs = false
-begin
-    model, time = @timed solve_rsa(
-        rg; optimizer = HiGHS.Optimizer, time_limit, num_roots, max_overlapping
-    );
-    rss_raw = get_rootsystems(rg, pg, model);
-    rss = greedy_switch(rss_raw, f_obj = weighted_tortuosity);
-end;
-
-# ╔═╡ 20ffd4b3-481b-4e7b-83d2-7be41bd497f4
-begin
-	f_root = Figure()
-	RootUntangling.rootplot!(
-		Axis(f_root[1, 1], aspect = DataAspect()), rss_raw, size = (600, 600), 
-		title = "Weighted tortuosity: $(weighted_tortuosity(rss_raw))"
-	)
-	RootUntangling.rootplot!(
-		Axis(f_root[1, 2], aspect = DataAspect()), rss, size = (600, 600),
-		title = "Weighted tortuosity: $(weighted_tortuosity(rss_raw))"
-	)
-	f_root
+if from_scratch
+	if go > 0
+		cluster_root_counts = [cluster_root_counts_input...]
+		root_clusters = RootUntangling.get_root_clusters(
+			rgs, pg, cluster_root_counts; optimizer = Gurobi.Optimizer, time_limit = 60
+		)
+		annotation_dict = RootUntangling.get_annotation_dict(rgs, root_clusters)
+		error_dict = Dict()
+	end
+else
+	RootUntangling.fix_groundtruth("../data/$(dir)/ROI_$(roi_nr)/GT.txt")
+	annotation_dict, error_dict = read_annotation("../data/$(dir)/ROI_$(roi_nr)/$(load_corrected ? "GT_new" : "GT").txt")
 end
-
-# ╔═╡ 00312cba-17c3-4bf7-acf2-e637a99c710e
-md"## Annotation"
-
-# ╔═╡ f7d8603d-9939-4b79-bc1b-27a3fc311234
-# ╠═╡ show_logs = false
-root_clusters = RootUntangling.get_root_clusters(rgs, pg, [1, 1]; optimizer = HiGHS.Optimizer, time_limit = 60);
-
-# ╔═╡ 95fce8b3-1db5-4a61-b4e3-0e8e36181416
-annotation_dict = RootUntangling.get_annotation_dict(rgs, root_clusters);
 
 # ╔═╡ 17648059-dcb1-400a-bc89-1a5bb734ee03
-root_nums = [
-    length(unique(last.(filter(k -> k[1] == i, reduce(vcat, values(annotation_dict))))))
-    for i in sort(unique(first.(reduce(vcat, values(annotation_dict)))))
-]
-
-# ╔═╡ ff4f7aee-13c6-49c2-837d-12a3e741c28c
-root_color(root_idx, num_roots) = (
-    root_idx == 1 ? HSV(0, 1, 0) : (
-        num_roots == 1 ? HSV(0, 1, 0.75) : 
-            HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75)
-    )
-)
-
-# ╔═╡ 16b156b2-a73b-424c-b271-9e15994c4d2f
-function set_colors!(edge_color_dict::Dict, annotation_dict::Dict, 
-		rg::RootGraph, root_nums::Vector
-	)
-	for re in E₀(rg)
-		haskey(annotation_dict, segment_id(re)) || continue
-		colors = [
-			root_color(root_idx, root_nums[rs_idx])
-			for (rs_idx, root_idx) in annotation_dict[segment_id(re)]
-		]
-		if !isempty(colors)
-			edge_color_dict[re][] = Makie.weighted_color_mean(ones(length(colors))/length(colors), colors)
-		else
-			edge_color_dict[re][] = HSV(0, 0, 0.5)
-		end
-	end
-
-	return nothing
-end
-
-# ╔═╡ 1de98531-6b6a-4443-8fb7-793509730fe8
-function set_annotations!(annotations::Observable, annotation_dict::Dict, 
-		rg::RootGraph
-	)
-	
-	annotations[] = [
-		string(
-			get(annotation_dict, segment_id(re), "[]") |>
-				x -> isempty(x) ? "[]" : x
-		)
-		for re in E₀(rg)
-	]
-
-	return nothing
+if @isdefined annotation_dict
+    root_nums = [
+        length(unique(last.(filter(k -> k[1] == i, reduce(vcat, values(annotation_dict))))))
+        for i in sort(unique(first.(reduce(vcat, values(annotation_dict)))))
+    ]
+    # root_nums = fill(100, 11)
 end
 
 # ╔═╡ 08de3104-630e-4792-836f-0ab11d324470
-@bind working_on Select(
-	sort(unique(reduce(vcat, values(annotation_dict))))
-)
+if @isdefined annotation_dict
+	@bind working_on_button Select(
+		unique(reduce(vcat, values(annotation_dict))) |>
+			x -> [x; [(rs, maximum(last.(x[findall(_x -> _x[1] == rs, x)]))+1) for rs in unique(first.(x))]] |>
+			x -> [x; [(maximum(unique(first.(x)))+1, 1)]] |>
+			sort
+	)
+end
 
 # ╔═╡ 2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
-begin    
-    f = Figure(; size = (800, 800))
+if @isdefined annotation_dict
+    # instantiate figure with observables
+    f = Figure(; size = (700, 700))
     ax = Axis(f[1, 1]; aspect = DataAspect())
 
     edge_color_dict = [
-        re => Observable(HSVA(0, 0, 0, 0))
+        re => Observable(HSVA(0, 0, 0, 0.3))
         for re in E₀(rg_full)
     ] |> Dict
 
@@ -225,22 +275,41 @@ begin
     set_colors!(edge_color_dict, annotation_dict, rg_full, root_nums)
     set_annotations!(annotations, annotation_dict, rg_full)
 
-    on(events(f).mousebutton, priority = 2) do event
+    info_label = Observable("(1, 1)")
+    text!(
+        ax, 0.05, 0.95;
+        text = info_label,
+        space = :relative,
+        fontsize = 16
+    )
+    debug_label = Observable("0")
+    text!(
+        ax, 0.95, 0.95;
+        text = debug_label,
+        space = :relative,
+        fontsize = 16
+    )
+    
+    # update based on user input
+    s_id = nothing
+    working_on = Observable((1, 1))
+
+    on(events(ax.scene).mouseposition) do event
+        s_id = get_segment_id(f)
+        debug_label[] = string(s_id)
+    end
+    
+    on(events(f).mousebutton) do event
         if event.button == Mouse.left && event.action == Mouse.press
-            elements = Makie.pick_sorted(f.scene, events(f).mouseposition[], 30)
-            line_idx = findfirst(x -> x[1] isa Lines, elements)
-            if !isnothing(line_idx)
-                line_element = elements[line_idx]
-                re_picked = line_element[1].arg2.value[]
-                
-                s_id = segment_id(re_picked)
-
+            s_id = get_segment_id(f)
+            if !isnothing(s_id)
                 current_annotation_idx = findfirst(
-                    x -> x == working_on, annotation_dict[s_id]
+                    x -> x == working_on[], 
+                    get!(annotation_dict, s_id, Tuple{Int64, Int64}[])
                 )
-
+    
                 if isnothing(current_annotation_idx)
-                    push!(annotation_dict[s_id], working_on)
+                    push!(annotation_dict[s_id], working_on[])
                 else
                     deleteat!(annotation_dict[s_id], current_annotation_idx)
                 end
@@ -249,19 +318,34 @@ begin
             end
         end
     end
+
+    on(events(f).keyboardbutton) do event
+        if event.key == Keyboard.space && event.action == Keyboard.press
+            s_id = get_segment_id(f)
+            if haskey(annotation_dict, s_id) && !isempty(annotation_dict[s_id])
+                w_idx = findfirst(id -> id == working_on[], annotation_dict[s_id])
+                working_on[] = isnothing(w_idx) ? annotation_dict[s_id][1] : 
+                    annotation_dict[s_id][w_idx]
+                info_label[] = string(working_on[])
+            end
+        end
+    end
     f
 end
 
-# ╔═╡ 9b60de2c-19e6-40ca-b4b0-bc60b19f3adb
-annotation_dict
+# ╔═╡ e756a41b-cf15-4b3a-bfe7-3cb4ddde0ac4
+if @isdefined working_on
+	working_on[] = working_on_button
+end
 
-# ╔═╡ c9f608c8-0088-4667-909e-2ed0cc0d1866
-@bind done CounterButton()
+# ╔═╡ 8f725f54-4429-48a4-856f-93d9b664b74e
+done_ref = Ref(done)
 
 # ╔═╡ 78a5a17f-8064-437f-bdf5-6ac47fe0741c
-if done > 0
-    write_annotation(homedir() * "/Downloads/test_$(roi_nr).txt", rg_full, annotation_dict)
-end
+if done_ref[] > 0
+    write_annotation("../data/$(dir)/ROI_$(roi_nr)/GT_new.txt", rg_full, annotation_dict, error_dict)
+    done_ref[] = 0
+end;
 
 # ╔═╡ Cell order:
 # ╟─1423c220-fb6d-4c4c-bd07-140e29cc79cc
@@ -270,27 +354,30 @@ end
 # ╠═1ebe1d3c-dd67-44d5-b292-c6ce4b9f9aa1
 # ╟─71e10643-4c1d-4069-bd9e-eb8fd58dccc7
 # ╠═72b6f5ea-f063-4705-bc9c-b06d55fd0d43
-# ╠═c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
-# ╟─0bce83d3-e008-45d0-b32c-0b08c9b6711b
+# ╟─9bedbeba-0a6c-447c-ae17-0cec8e95d23c
+# ╟─079900fc-3ce2-4b67-9de1-3f2654523eff
+# ╟─690ea173-af44-475e-bc5a-1f1044e48309
 # ╠═8d59a0ee-4f91-48b7-993c-20e799c957ce
-# ╠═792c91d6-4863-4165-b926-c8b0769a0481
-# ╟─3fc9f8b8-e6e8-4409-a920-98d30ac9c2d1
-# ╠═690ea173-af44-475e-bc5a-1f1044e48309
-# ╠═d86ed7ae-877e-42e8-a748-109e92daab38
-# ╟─3f40ee53-68ad-4bfa-a784-bbad4a366f02
-# ╟─7894d17f-b98c-4e19-8d3b-4fb690aaeb42
-# ╠═990ad7fb-4256-41ce-a6fe-520a103c5ea7
-# ╟─5355a78b-3bee-454e-a18b-0e6ac2d202b7
-# ╟─20ffd4b3-481b-4e7b-83d2-7be41bd497f4
+# ╟─792c91d6-4863-4165-b926-c8b0769a0481
 # ╟─00312cba-17c3-4bf7-acf2-e637a99c710e
-# ╠═f7d8603d-9939-4b79-bc1b-27a3fc311234
-# ╠═95fce8b3-1db5-4a61-b4e3-0e8e36181416
 # ╟─17648059-dcb1-400a-bc89-1a5bb734ee03
+# ╟─d16d027b-f57b-4d91-bafd-4ea0d14241f6
+# ╟─fee7a9e4-481e-40c9-9ffc-fa12fcf1b12b
+# ╟─2676da59-c62a-4595-9d05-7a36389a0196
+# ╟─af73fbe5-f5ba-494e-a82a-7391eab778c0
+# ╟─08de3104-630e-4792-836f-0ab11d324470
+# ╟─2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
+# ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
+# ╟─78a5a17f-8064-437f-bdf5-6ac47fe0741c
+# ╟─150e2c5e-9828-4180-98b1-cb027d76cba6
+# ╟─92477ec2-047e-4d6b-971a-9985662de553
+# ╟─6c3bd7e0-1d81-46e0-935d-4f6ec23a55a2
 # ╟─ff4f7aee-13c6-49c2-837d-12a3e741c28c
 # ╟─16b156b2-a73b-424c-b271-9e15994c4d2f
-# ╠═1de98531-6b6a-4443-8fb7-793509730fe8
-# ╟─08de3104-630e-4792-836f-0ab11d324470
-# ╠═2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
-# ╠═9b60de2c-19e6-40ca-b4b0-bc60b19f3adb
-# ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
-# ╠═78a5a17f-8064-437f-bdf5-6ac47fe0741c
+# ╟─1de98531-6b6a-4443-8fb7-793509730fe8
+# ╟─7f2bd2eb-83d1-495e-b4bf-226beca9f733
+# ╟─c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
+# ╠═75f65731-fcd7-4d60-baee-3b26f9a3a95d
+# ╟─0a1e3cc5-d1bb-4049-b4a3-79b05e46bcd4
+# ╟─e756a41b-cf15-4b3a-bfe7-3cb4ddde0ac4
+# ╟─8f725f54-4429-48a4-856f-93d9b664b74e
