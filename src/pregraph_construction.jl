@@ -231,8 +231,9 @@ function differentiate_duplicates!(
     duplicates = duplicate_elements(s -> sort(vertices(s)), segments)
     
     # delete segments below pixel length threshold
-    tiny_duplicate_idxs = findall(s -> length(xs(s)) < loop_threshold, duplicates)
+    tiny_duplicate_idxs = findall(s -> s in duplicates && length(xs(s)) < loop_threshold, segments)
     deleteat!(segments, tiny_duplicate_idxs)
+    duplicates = duplicate_elements(s -> sort(vertices(s)), segments)
     
     # stop if no (more) duplicates
     isempty(duplicates) && return nothing
