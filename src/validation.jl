@@ -1,11 +1,66 @@
 function fix_groundtruth(file::String)
     lines = readlines(file)
     filter!(!isempty, lines)
-    newlines = [
-        length(split(line, ',')) == 2 ? line * ',' : line
+    isempty(split(lines[1], ',')[end]) && (lines[1] *= "real_length")
+
+    datamat = [
+        split(line, ',') |> 
+            x -> length(x) == 2 ? [x; ""] : x
         for line in lines
-    ]
-    isempty(split(newlines[1], ',')[end]) && (newlines[1] *= "real_length")
+    ] |> x -> reduce(hcat, x) |> permutedims
+
+    # (potentially) fix duplicate ids
+    ids = datamat[2:end, 1]
+    if !allunique(ids)
+        @warn("Duplicate ids found in ground truth. Attempting repair.")
+        duplicate_ids = unique(duplicate_elements(ids))
+        delete_idxs = Int64[]
+        for id in duplicate_ids
+            row_idxs = findall(datamat[:, 1] .== id)
+            rows = [datamat[r, :] for r in row_idxs]
+            if allequal(rows)
+                @debug "id $(id): All rows equal"
+                append!(delete_idxs, row_idxs[2:end])
+            else
+                @debug "id $(id): Unequal rows\n$(rows)"
+                truerow_idx = findfirst(
+                    r -> all([
+                        all([occursin(row[i], r[i]) for i in eachindex(r)])
+                        for row in rows
+                    ]), 
+                    rows
+                )
+                isnothing(truerow_idx) && @error "id $(id): Unequal rows\n$(rows)\nTrue data is ambiguous"
+                @debug "True row found\n$(rows[truerow_idx])"
+                append!(delete_idxs, row_idxs[[1:truerow_idx-1; truerow_idx+1:end]])
+            end
+        end
+        datamat = datamat[.!in.(1:size(datamat, 1), [delete_idxs]), :]
+    end
+
+    # correct root annotations to have sequential root idxs
+    ann_correction_dict = Dict{Regex, String}()
+    root_anns = reduce(vcat, split.(datamat[2:end, 2], ';')) |>
+        x -> filter(_x -> _x != "-", x) |>
+        x -> split.(x, '.') .|>
+        x -> isempty(x) ? x : parse.(Int64, x)
+
+    for rs_idx in unique(first.(root_anns))
+        current_root_anns = filter(x -> x[1] == rs_idx, root_anns) .|> last |> unique |> sort
+        for (i, og_idx) in enumerate(current_root_anns)
+            i != og_idx && (
+                ann_correction_dict[Regex("$(rs_idx).$(og_idx)(?![0-9])")] = "$(rs_idx).$(i)"
+            )
+        end
+    end
+
+    isempty(ann_correction_dict) || @info "$(length(ann_correction_dict)) root indices corrected to ensure sequential root indices"
+    for i in 2:size(datamat, 1)
+        datamat[i, 2] = replace(datamat[i, 2], collect(ann_correction_dict)...)
+    end
+
+    # convert back to text and write
+    newlines = [*(r .* ','...)[1:end-1] for r in eachrow(datamat)]
     newtext = *((newlines .* '\n')...)[1:end-1]
 
     write(file, newtext)
