@@ -27,7 +27,8 @@ function write_annotation(filename::String, rg_full::RootGraph,
     io = open(filename, "w")
     write(io, "Segment_ID,root_ids,real_length")
 
-    segment_ids = unique(og_segment_id.(E₀(rg_full)))
+    segment_ids = [og_segment_id.(E₀(rg_full)); collect(keys(error_dict))]
+    unique!(segment_ids)
     sort!(segment_ids)
 
     for segment_id in segment_ids
