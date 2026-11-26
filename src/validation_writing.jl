@@ -1,8 +1,6 @@
-function read_annotation(filename::String)
-    data_dict = read_data(filename, :Segment_ID, missing_string = "-", parse_strings = false) |>
-        x -> [parse(Int64, key) => x[key] for key in keys(x)] |> Dict
-
-    annotation_dict = [
+function read_annotation_dict(filename::String)
+    data_dict = get_annotation_data(filename)
+    return [
         key => (
             data_dict[key][:root_ids] |>
                 x -> x isa Vector ? [tuple(parse.(Int64, split(ids, '.'))...) for ids in x] :
@@ -11,14 +9,20 @@ function read_annotation(filename::String)
         for key in keys(data_dict)
         if !ismissing(data_dict[key][:root_ids])
     ] |> Dict
+end
 
-    errors_dict = [
+function read_error_dict(filename::String)
+    data_dict = get_annotation_data(filename)
+    return [
         key => data_dict[key][:real_length] |> 
             x -> ismissing(x) ? x : parse(Int64, x)
         for key in keys(data_dict)
     ] |> Dict
+end
 
-    return annotation_dict, errors_dict
+function get_annotation_data(filename::String)
+    return read_data(filename, :Segment_ID, missing_string = "-", parse_strings = false) |>
+        x -> [parse(Int64, key) => x[key] for key in keys(x)] |> Dict
 end
 
 function write_annotation(filename::String, rg_full::RootGraph, 
