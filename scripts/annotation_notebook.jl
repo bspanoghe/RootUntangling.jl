@@ -82,6 +82,9 @@ end
 # ╔═╡ c9f608c8-0088-4667-909e-2ed0cc0d1866
 @bind done CounterButton("Save annotation")
 
+# ╔═╡ 2e87558f-1c4f-40d7-b98f-8aa4e8858bb8
+md"## Just checking some stuff aha"
+
 # ╔═╡ 150e2c5e-9828-4180-98b1-cb027d76cba6
 md"## Source"
 
@@ -112,16 +115,10 @@ function input_cluster_root_counts(rgs::Vector{<:RootGraph})
 end
 
 # ╔═╡ ff4f7aee-13c6-49c2-837d-12a3e741c28c
-# root_color(root_idx, num_roots) = (
-#     root_idx == 1 ? HSV(0, 1, 0) : (
-#         num_roots == 1 ? HSV(0, 1, 0.75) : 
-#             HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75)
-#     )
-# )
 root_color(root_idx, num_roots) = (
     root_idx == 1 ? HSV(0, 1, 0) : 
     num_roots == 1 ? HSV(0, 1, 0.75) : 
-    root_idx <= num_roots ? HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75) : HSV(0, 1, 1)
+    root_idx <= num_roots ? HSV(range(0, 360, length = num_roots)[root_idx], 1, 0.75) : HSV(root_idx * 360 * (1 + sqrt(5))/2, 1, 1)
 ) #!
 
 # ╔═╡ 16b156b2-a73b-424c-b271-9e15994c4d2f
@@ -181,10 +178,15 @@ end
 # ╔═╡ 690ea173-af44-475e-bc5a-1f1044e48309
 @bind roi_nr Select(get_ROIs(dir))
 
+# ╔═╡ d88b834b-241f-4972-ae13-281d8b62b26d
+begin
+	filename_segments = "../data/$(dir)/ROI_$(roi_nr)/segment_info_with_coords.csv"
+    filename_vertices = "../data/$(dir)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
+	filename_GT = "../data/$(dir)/ROI_$(roi_nr)/$(@isdefined(load_corrected) && load_corrected ? "GT_new.txt" : "GT.txt")"
+end
+
 # ╔═╡ c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
 begin
-    filename_segments = "../data/$(dir)/ROI_$(roi_nr)/segment_info_with_coords.csv"
-    filename_vertices = "../data/$(dir)/ROI_$(roi_nr)/bp1_segments_grouped.csv"
     pg = get_pregraph(filename_segments, filename_vertices; cluster_threshold, loop_threshold, reverse_y, angle_correction)
     rg_full = get_rootgraph(pg)
 end
@@ -213,8 +215,13 @@ if from_scratch
 	@bind cluster_root_counts_input input_cluster_root_counts(rgs)
 end
 
+# ╔═╡ ca219486-3522-4f3a-837b-b3fc99b2e670
+if !from_scratch
+    vrss = get_valrootsystems(filename_GT, pg, rg_full)
+    rootplot(vrss, size = (700, 400))
+end
+
 # ╔═╡ 0a1e3cc5-d1bb-4049-b4a3-79b05e46bcd4
-# ╠═╡ show_logs = false
 if from_scratch
 	if go > 0
 		cluster_root_counts = [cluster_root_counts_input...]
@@ -225,8 +232,11 @@ if from_scratch
 		error_dict = Dict()
 	end
 else
-	RootUntangling.fix_groundtruth("../data/$(dir)/ROI_$(roi_nr)/GT.txt")
-	annotation_dict, error_dict = read_annotation("../data/$(dir)/ROI_$(roi_nr)/$(load_corrected ? "GT_new" : "GT").txt")
+	if isfile(filename_GT)
+		RootUntangling.fix_groundtruth(filename_GT)
+		annotation_dict = read_annotation_dict(filename_GT)
+		error_dict = read_error_dict(filename_GT)
+	end
 end
 
 # ╔═╡ 17648059-dcb1-400a-bc89-1a5bb734ee03
@@ -236,6 +246,8 @@ if @isdefined annotation_dict
         for i in sort(unique(first.(reduce(vcat, values(annotation_dict)))))
     ]
     # root_nums = fill(100, 11)
+else
+    @warn "There is no GT file available for this root system"
 end
 
 # ╔═╡ 08de3104-630e-4792-836f-0ab11d324470
@@ -320,17 +332,56 @@ if @isdefined annotation_dict
     end
 
     on(events(f).keyboardbutton) do event
-        if event.key == Keyboard.space && event.action == Keyboard.press
-            s_id = get_segment_id(f)
-            if haskey(annotation_dict, s_id) && !isempty(annotation_dict[s_id])
-                w_idx = findfirst(id -> id == working_on[], annotation_dict[s_id])
-                working_on[] = isnothing(w_idx) ? annotation_dict[s_id][1] : 
-                    annotation_dict[s_id][w_idx]
+        if event.action == Keyboard.press
+            if event.key == Keyboard.space
+                s_id = get_segment_id(f)
+                if haskey(annotation_dict, s_id) && !isempty(annotation_dict[s_id])
+                    w_idx = findfirst(id -> id == working_on[], annotation_dict[s_id])
+                    working_on[] = isnothing(w_idx) ? annotation_dict[s_id][1] : 
+                        get(annotation_dict[s_id], w_idx + 1, annotation_dict[s_id][1])
+                    info_label[] = string(working_on[])
+                end
+            elseif event.key == Keyboard.q
+                working_on[] = (working_on[][1], working_on[][2] - 1)
+                info_label[] = string(working_on[])
+            elseif event.key == Keyboard.w
+                working_on[] = (working_on[][1], working_on[][2] + 1)
+                info_label[] = string(working_on[])
+                info_label[] = string(working_on[])
+            elseif event.key == Keyboard.e
+                working_on[] = reduce(vcat, values(annotation_dict)) |>
+                    unique |>
+                    x -> filter(i -> i[1] == working_on[][1], x) |>
+                    x -> (working_on[][1], maximum(last.(x)) + 1)
                 info_label[] = string(working_on[])
             end
         end
     end
     f
+end
+
+# ╔═╡ 1053aa28-910d-49b0-a85b-ab01d2610f9c
+if @isdefined root_clusters
+	metric = pixels
+    rss = reduce(vcat, root_clusters)
+	rs_mapping, root_mappings = get_optimal_mappings(rss, vrss, metric, optimizer = HiGHS.Optimizer)
+
+	for (i, rs) in enumerate(rss)
+        vrs = vrss[rs_mapping[i]]
+        rs_copy, vrs_copy = deepcopy(rs), deepcopy(vrs);
+        add_dummy_roots!(rs_copy, vrs_copy)
+        final_loss = get_loss(rs_copy, vrs_copy, root_mappings[i], metric, verbose = true)
+        laterals(vrs_copy) .= laterals(vrs_copy)[root_mappings[i]];
+    
+        local f = rootplot(vrs_copy, rs_copy)
+        Axis(f[1, 1]).title = "GT"
+        Axis(f[1, 3]).title = "Predicted"
+        Label(f[0, :], "loss = $(final_loss) $(string(metric))")
+        WGLMakie.Bonito.export_static(
+            homedir() * "/Downloads/validation_$(difficulty)_$(roi_nr)_$i.html",
+            WGLMakie.Bonito.App(f)
+        )
+    end
 end
 
 # ╔═╡ e756a41b-cf15-4b3a-bfe7-3cb4ddde0ac4
@@ -345,7 +396,8 @@ done_ref = Ref(done)
 if done_ref[] > 0
     write_annotation("../data/$(dir)/ROI_$(roi_nr)/GT_new.txt", rg_full, annotation_dict, error_dict)
     done_ref[] = 0
-end;
+    println("Annotation saved$("!"^(ceil(Int64, 30*rand())))")
+end
 
 # ╔═╡ Cell order:
 # ╟─1423c220-fb6d-4c4c-bd07-140e29cc79cc
@@ -369,6 +421,9 @@ end;
 # ╟─2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 # ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
 # ╟─78a5a17f-8064-437f-bdf5-6ac47fe0741c
+# ╟─2e87558f-1c4f-40d7-b98f-8aa4e8858bb8
+# ╠═ca219486-3522-4f3a-837b-b3fc99b2e670
+# ╟─1053aa28-910d-49b0-a85b-ab01d2610f9c
 # ╟─150e2c5e-9828-4180-98b1-cb027d76cba6
 # ╟─92477ec2-047e-4d6b-971a-9985662de553
 # ╟─6c3bd7e0-1d81-46e0-935d-4f6ec23a55a2
@@ -376,8 +431,9 @@ end;
 # ╟─16b156b2-a73b-424c-b271-9e15994c4d2f
 # ╟─1de98531-6b6a-4443-8fb7-793509730fe8
 # ╟─7f2bd2eb-83d1-495e-b4bf-226beca9f733
+# ╟─d88b834b-241f-4972-ae13-281d8b62b26d
 # ╟─c26c9948-8ff1-44c3-8b68-8e0907fdb3ec
-# ╠═75f65731-fcd7-4d60-baee-3b26f9a3a95d
+# ╟─75f65731-fcd7-4d60-baee-3b26f9a3a95d
 # ╟─0a1e3cc5-d1bb-4049-b4a3-79b05e46bcd4
 # ╟─e756a41b-cf15-4b3a-bfe7-3cb4ddde0ac4
 # ╟─8f725f54-4429-48a4-856f-93d9b664b74e
