@@ -174,3 +174,73 @@ function rootplot(rss::Vector{<:RootSystem}; size = (600, 400), line_kwargs::Dic
 
     return f
 end
+
+function rootplot!(ax::Makie.Axis, vrs::ValRootSystem; kwargs...)
+    r = primary(vrs)
+    scatter!(ax, r; color = HSV(0, 1, 0), label = "0", markersize = 2, kwargs...)
+
+    for (i, r) in enumerate(laterals(vrs))
+        color = HSV(range(0, 360, length = length(vrs))[i], 1, 0.75)
+        scatter!(ax, r; color, label = "$i", markersize = 2, kwargs...)
+    end
+end
+
+function rootplot!(ax::Makie.Axis, vrss::Vector{<:ValRootSystem}; kwargs...)
+    for (i, vrs) in enumerate(vrss)
+        r = primary(vrs)
+        scatter!(ax, r; color = HSV(0, 1, 0), label = "$(i)-0", markersize = 2, kwargs...)
+
+        for (j, r) in enumerate(laterals(vrs))
+            color = HSV(range(0, 360, length = length(vrs))[j], 1, 0.75)
+            scatter!(ax, r; color, label = "$(i)-$(j)", markersize = 2, kwargs...)
+        end
+    end
+end
+
+function rootplot(vrs::ValRootSystem; size = (600, 400), line_kwargs::Dict = Dict(), kwargs...)
+    f = Figure(; size)
+    ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
+    rootplot!(ax, vrs; line_kwargs...)
+
+    return f
+end
+
+function rootplot(vrss::Vector{<:ValRootSystem}; size = (1200, 400), line_kwargs::Dict = Dict(), kwargs...)
+    f = Figure(; size)
+    ax = Axis(f[1, 1]; aspect = DataAspect(), kwargs...)
+    rootplot!(ax, vrss; line_kwargs...)
+
+    return f
+end
+
+function rootplot(vrs::ValRootSystem, rs::RootSystem; size = (1200, 600), kwargs...)
+    f = Figure(; size)
+    rootplot!(Axis(f[1, 1], aspect = DataAspect()), vrs)
+    f[1, 2] = Legend(f, f.content[end])
+    rootplot!(Axis(f[1, 3], aspect = DataAspect()), rs)
+    f[1, 4] = Legend(f, f.content[end])
+    return f
+end
+
+# # more validation things
+function plot_mistakes(rg::RootGraph, rss::Vector{<:RootSystem}, vrss::Vector{<:ValRootSystem}, rs_mapping, root_mappings)
+    rss, vrss = (deepcopy(rss), deepcopy(vrss))
+    for (i, (rs, vrs)) in enumerate(zip(rss, vrss[rs_mapping]))
+        add_dummy_roots!(rs, vrs)
+        laterals(vrs) .= laterals(vrs)[root_mappings[i]];
+    end
+
+    incorrect_segments_ids = [
+        [
+            full_setdiff(standard_segments(laterals(rs)[i]), standard_segments(laterals(vrs)[i]))
+            for i in eachindex(laterals(rs))
+        ] |> x -> reduce(vcat, x)
+        for (rs, vrs) in zip(rss, vrss[rs_mapping])
+    ] |> x -> reduce(vcat, x)
+
+    f = graphplot(rg)
+    for re in filter(re -> re.og_segment_id ∈ incorrect_segments_ids, E₀(rg))
+        lines!(f[1, 1], rg, re, color = :red, linewidth = 10, alpha = 0.3)
+    end
+    return f
+end

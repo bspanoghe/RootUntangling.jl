@@ -30,8 +30,9 @@ include("solving.jl"); # solve problem based on rootgraph
 include("root_types.jl"); # type to represent resulting roots
 include("root_construction.jl"); # get the roots
 include("root_postprocessing.jl"); # postprocessing on roots
+include("validation_construction.jl"); # create validation rootsystems
+include("validation_loss.jl"); # get loss between model prediction and validation data
+include("validation_writing.jl"); # read and write validation data
 include("plotting.jl"); # visualisation
-include("annotation.jl"); # annotate graphs with root identities
-include("validation.jl"); # compare results with data
 
 end
