@@ -25,85 +25,50 @@ Base.length(vrs::ValRootSystem) = length(roots(vrs))
 xs(vrs::ValRootSystem) = reduce(vcat, xs.(roots(vrs)))
 ys(vrs::ValRootSystem) = reduce(vcat, ys.(roots(vrs)))
 
-function get_validation_data(filename_GT::String, filename_segments::String, filename_vertices::String;
-        cluster_threshold, loop_threshold, reverse_y, angle_correction
-    )
-    
-    # get original (not cleaned) segments
-    vertex_data_dict, edge_data_dict = get_data_dicts(filename_segments, filename_vertices; reverse_y, angle_correction)
-    metavertices = getmetavertices(vertex_data_dict)
-    segments = getsegments(metavertices, vertex_data_dict, edge_data_dict)
-    sort_segment_coordinates!(segments, metavertices)
+function get_valrootsystems(filename_GT::String, pg::PreGraph, rg::RootGraph)
+    # read ground truth `segment_id` => `[(rootsys_idx, rootnum_idx), (...), ...]`
+    annotation_dict = read_annotation_dict(filename_GT)
 
-    # get how segments map to roots in the ground truth
-    valdata = read_data(filename_GT, :Segment_ID, missing_string = "-", parse_strings = false) |>
-        x -> [parse(Int64, key) => x[key] for key in keys(x)] |> Dict
-    root_segment_mappings = get_root_segment_mappings(valdata)
-
-    rg = get_rootgraph(filename_segments, filename_vertices; cluster_threshold, loop_threshold, reverse_y, angle_correction)
-
-    vrss = get_valrootsystem.([rg], [segments], root_segment_mappings)
-
-    root_segmentation_errors = [
-        filter(!ismissing, Any[
-            valdata[seg_id][:real_length]
-            for seg_id in reduce(vcat, values(root_segment_mapping))
-        ]) .|> (x -> parse(Int64, x)) |> sum
-        for root_segment_mapping in root_segment_mappings
+    # cluster segment ids by rootsystem and root
+    ## invert annotation dict `(rootsys_idx, rootnum_idx) => segment_ids`
+	inverted_annotation_dict = Dict{valtype(annotation_dict).parameters[1], Vector{keytype(annotation_dict)}}()
+    for (k, v) in annotation_dict
+        for segment_id in v
+            push!(
+                get!(inverted_annotation_dict, segment_id, Int64[]),
+                k
+            )
+        end
+    end
+    ## expand dict to `rootsys_idx` => `rootnum_idx` => segment_ids
+    rs_idxs = unique(first.(keys(inverted_annotation_dict)))
+    root_seg_dicts = [
+        Dict([
+            rootnum_idx => inverted_annotation_dict[(rs_idx, rootnum_idx)]
+            for rootnum_idx in unique(last.(filter(k -> k[1] == rs_idx, keys(inverted_annotation_dict))))
+        ])
+        for rs_idx in rs_idxs
     ]
 
-    return vrss, root_segmentation_errors
+    # make validation rootsystems from clustered rootedges
+    return [get_valrootsystem(root_seg_dict, pg, rg) for root_seg_dict in root_seg_dicts]
 end
 
-function get_root_segment_mappings(valdata::Dict)
-    id_mapping = [
-        key => [
-            parse.(Int64, root_id) 
-            for root_id in split.(valdata[key][:root_ids], '.')
-        ] |>
-            x -> x isa Vector{Int64} ? [(x...,)] : [(_x...,) for _x in x]
-        for key in keys(valdata)
-        if !ismissing(valdata[key][:root_ids])
-    ] |> Dict
-
-    root_ids = values(id_mapping) |>
-        x -> reduce(vcat, x) |>
-        unique
-
-    root_mapping = [
-        id => [key for key in keys(id_mapping) if id ∈ id_mapping[key]]
-        for id in root_ids
-    ]
-
-    rs_ids = unique(first.(first.(root_mapping))) |> sort
-    root_segment_mappings = [
-        [
-            mapping[1][2] => mapping[2]
-            for mapping in root_mapping
-            if mapping[1][1] == rs_id
-        ] |> Dict
-        for rs_id in rs_ids
-    ]
-    @assert all(allunique(keys(root_segment_mappings[i])) for i in eachindex(root_segment_mappings))
-
-    return root_segment_mappings
-end
-
-function get_valrootsystem(rg::RootGraph{T, U}, segments, root_segment_mapping::Dict) where {T, U}
+function get_valrootsystem(root_seg_dict::Dict, pg::PreGraph{T, U}, rg::RootGraph{T, U}) where {T, U}
     primary = ValRoot(
         true,
-        filter(e -> e.segment_id ∈ root_segment_mapping[1], E₀(rg)),
-        reduce(vcat, xs.(filter(s -> s.id ∈ root_segment_mapping[1], segments)), init = U[]),
-        reduce(vcat, ys.(filter(s -> s.id ∈ root_segment_mapping[1], segments)), init = U[]),
+        filter(re -> og_segment_id(re) ∈ root_seg_dict[1], E₀(rg)),
+        reduce(vcat, xs.(filter(s -> og_id(s) ∈ root_seg_dict[1], pg.segments)), init = U[]),
+        reduce(vcat, ys.(filter(s -> og_id(s) ∈ root_seg_dict[1], pg.segments)), init = U[])
     )
     laterals = [
         ValRoot(
             false,
-            filter(e -> e.segment_id ∈ root_segment_mapping[i], E₀(rg)),
-            reduce(vcat, xs.(filter(s -> s.id ∈ root_segment_mapping[i], segments)), init = U[]),
-            reduce(vcat, ys.(filter(s -> s.id ∈ root_segment_mapping[i], segments)), init = U[]),
+            filter(re -> og_segment_id(re) ∈ root_seg_dict[i], E₀(rg)),
+            reduce(vcat, xs.(filter(s -> og_id(s) ∈ root_seg_dict[i], pg.segments)), init = U[]),
+            reduce(vcat, ys.(filter(s -> og_id(s) ∈ root_seg_dict[i], pg.segments)), init = U[])
         )
-        for i in filter(x -> x != 1, keys(root_segment_mapping))
+        for i in filter(x -> x != 1, keys(root_seg_dict))
     ]
 
     sort_root_coordinates!(primary, rg)

@@ -6,7 +6,7 @@ export solve_rsa # solving
 export get_rootsystems, primary, laterals, examine, curve_length # get and examine roots
 export greedy_switch, tortuosity, weighted_tortuosity # postprocess roots
 export graphplot, rootplot, annotation_plot # plotting
-export get_annotation_dict, read_annotation, write_annotation # write output
+export get_valrootsystems, read_annotation_dict, read_error_dict, write_annotation # write output
 export get_validation_data, get_optimal_mappings, standard_segments, pixels, add_dummy_roots!, get_loss, plot_mistakes
 
 # debugging exports
