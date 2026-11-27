@@ -10,7 +10,6 @@ xs(vr::ValRoot) = vr.xs
 ys(vr::ValRoot) = vr.ys
 
 Base.length(vr::ValRoot) = length(edges(vr))
-Makie.convert_arguments(::Type{<:Scatter}, vr::ValRoot) = (xs(vr), ys(vr))
 
 curve_length(vr::ValRoot) = curve_length(xs(vr), ys(vr))
 

@@ -141,6 +141,7 @@ end
 # # Root plotting
 # ## Type recipe for single roots
 Makie.convert_arguments(::Type{<:Lines}, r::Root) = (xs(r), ys(r))
+Makie.convert_arguments(::Type{<:Scatter}, vr::ValRoot; σ = 0.5) = (xs(vr) .+ σ*randn(length(xs(vr))), ys(vr) .+ σ*randn(length(xs(vr))))
 
 # ## Root systems
 function rootplot!(ax::Makie.Axis, rs::RootSystem; kwargs...)
@@ -175,25 +176,19 @@ function rootplot(rss::Vector{<:RootSystem}; size = (600, 400), line_kwargs::Dic
     return f
 end
 
-function rootplot!(ax::Makie.Axis, vrs::ValRootSystem; kwargs...)
+function rootplot!(ax::Makie.Axis, vrs::ValRootSystem; label_prefix = "", markersize = 3, alpha = 0.75, kwargs...)
     r = primary(vrs)
-    scatter!(ax, r; color = HSV(0, 1, 0), label = "0", markersize = 2, kwargs...)
+    scatter!(ax, r; color = HSV(0, 1, 0), label = label_prefix * "0", markerspace = :data, markersize, alpha, kwargs...)
 
     for (i, r) in enumerate(laterals(vrs))
         color = HSV(range(0, 360, length = length(vrs))[i], 1, 0.75)
-        scatter!(ax, r; color, label = "$i", markersize = 2, kwargs...)
+        scatter!(ax, r; color, label = label_prefix * "$i", markersize, alpha, markerspace = :data, kwargs...)
     end
 end
 
 function rootplot!(ax::Makie.Axis, vrss::Vector{<:ValRootSystem}; kwargs...)
     for (i, vrs) in enumerate(vrss)
-        r = primary(vrs)
-        scatter!(ax, r; color = HSV(0, 1, 0), label = "$(i)-0", markersize = 2, kwargs...)
-
-        for (j, r) in enumerate(laterals(vrs))
-            color = HSV(range(0, 360, length = length(vrs))[j], 1, 0.75)
-            scatter!(ax, r; color, label = "$(i)-$(j)", markersize = 2, kwargs...)
-        end
+        rootplot!(ax, vrs; label_prefix = "$i", kwargs...)
     end
 end
 
