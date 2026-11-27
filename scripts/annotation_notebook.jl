@@ -22,7 +22,7 @@ using Pkg
 # ╔═╡ 7d5639a6-a788-4877-8ac8-394ffb45a220
 begin
 	Pkg.activate()
-	using Revise, PlutoUI; TableOfContents()
+	using Revise, PlutoUI
 end
 
 # ╔═╡ 1ebe1d3c-dd67-44d5-b292-c6ce4b9f9aa1
@@ -30,7 +30,7 @@ begin
 	Pkg.activate(".")
 	using RootUntangling
 	using WGLMakie
-	using JuMP, HiGHS, Gurobi
+	using JuMP, HiGHS
 	import .Makie.HSV, .Makie.HSVA, RootUntangling.mean
 end
 
@@ -59,7 +59,7 @@ end
 # ╔═╡ 8d59a0ee-4f91-48b7-993c-20e799c957ce
 begin
     min_vertices = 10
-    y_min = -1000
+    y_min = -500
     y_max = 5000
 end
 
@@ -217,16 +217,17 @@ end
 
 # ╔═╡ ca219486-3522-4f3a-837b-b3fc99b2e670
 if !from_scratch
+    done
     vrss = get_valrootsystems(filename_GT, pg, rg_full)
-    rootplot(vrss, size = (700, 400))
-end
+    rootplot(vrss, size = (1000, 500))
+end |> WideCell
 
 # ╔═╡ 0a1e3cc5-d1bb-4049-b4a3-79b05e46bcd4
 if from_scratch
 	if go > 0
 		cluster_root_counts = [cluster_root_counts_input...]
 		root_clusters = RootUntangling.get_root_clusters(
-			rgs, pg, cluster_root_counts; optimizer = Gurobi.Optimizer, time_limit = 60
+			rgs, pg, cluster_root_counts; optimizer = HiGHS.Optimizer, time_limit = 60
 		)
 		annotation_dict = RootUntangling.get_annotation_dict(rgs, root_clusters)
 		error_dict = Dict()
@@ -243,7 +244,7 @@ end
 if @isdefined annotation_dict
     root_nums = [
         length(unique(last.(filter(k -> k[1] == i, reduce(vcat, values(annotation_dict))))))
-        for i in sort(unique(first.(reduce(vcat, values(annotation_dict)))))
+        for i in 1:maximum(first.(reduce(vcat, values(annotation_dict))))
     ]
     # root_nums = fill(100, 11)
 else
@@ -263,7 +264,7 @@ end
 # ╔═╡ 2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 if @isdefined annotation_dict
     # instantiate figure with observables
-    f = Figure(; size = (700, 700))
+    f = Figure(; size = (1600, 900))
     ax = Axis(f[1, 1]; aspect = DataAspect())
 
     edge_color_dict = [
@@ -358,7 +359,13 @@ if @isdefined annotation_dict
         end
     end
     f
-end
+end |> x -> WideCell(x; max_width = 1600)
+
+# ╔═╡ 16c86391-549f-4aa9-af3f-eb9ddfd44a7a
+findfirst(x -> !(x isa Vector{Tuple{Int64, Int64}}), annotation_dict)
+
+# ╔═╡ 94418555-83fb-4610-a04d-89d2823d3efb
+[k => v for (k, v) in error_dict if !ismissing(v)]
 
 # ╔═╡ 1053aa28-910d-49b0-a85b-ab01d2610f9c
 if @isdefined root_clusters
@@ -420,9 +427,11 @@ end
 # ╟─08de3104-630e-4792-836f-0ab11d324470
 # ╟─2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 # ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
+# ╠═16c86391-549f-4aa9-af3f-eb9ddfd44a7a
 # ╟─78a5a17f-8064-437f-bdf5-6ac47fe0741c
 # ╟─2e87558f-1c4f-40d7-b98f-8aa4e8858bb8
-# ╠═ca219486-3522-4f3a-837b-b3fc99b2e670
+# ╟─ca219486-3522-4f3a-837b-b3fc99b2e670
+# ╠═94418555-83fb-4610-a04d-89d2823d3efb
 # ╟─1053aa28-910d-49b0-a85b-ab01d2610f9c
 # ╟─150e2c5e-9828-4180-98b1-cb027d76cba6
 # ╟─92477ec2-047e-4d6b-971a-9985662de553
