@@ -176,7 +176,7 @@ function rootplot(rss::Vector{<:RootSystem}; size = (600, 400), line_kwargs::Dic
     return f
 end
 
-function rootplot!(ax::Makie.Axis, vrs::ValRootSystem; label_prefix = "", markersize = 3, alpha = 0.75, kwargs...)
+function rootplot!(ax::Makie.Axis, vrs::ValRootSystem; label_prefix = "", markersize = 5, alpha = 0.75, kwargs...)
     r = primary(vrs)
     scatter!(ax, r; color = HSV(0, 1, 0), label = label_prefix * "0", markerspace = :data, markersize, alpha, kwargs...)
 
