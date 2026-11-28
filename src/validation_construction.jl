@@ -138,10 +138,11 @@ function fix_groundtruth(file::String)
         current_root_anns = filter(x -> x[1] == rs_idx, root_anns) .|> last |> unique |> sort
         for (i, og_idx) in enumerate(current_root_anns)
             i != og_idx && (
-                ann_correction_dict[Regex("$(rs_idx).$(og_idx)(?![0-9])")] = "$(rs_idx).$(i)"
+                ann_correction_dict[Regex("$(rs_idx)\\.$(og_idx)(?![0-9])")] = "$(rs_idx).$(i)"
             )
         end
     end
+    println(ann_correction_dict) #!
 
     isempty(ann_correction_dict) || @info "$(length(ann_correction_dict)) root indices corrected to ensure sequential root indices"
     for i in 2:size(datamat, 1)
