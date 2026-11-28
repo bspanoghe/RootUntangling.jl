@@ -58,7 +58,7 @@ end
 
 # ╔═╡ 8d59a0ee-4f91-48b7-993c-20e799c957ce
 begin
-    min_vertices = 10
+    min_vertices = 5
     y_min = -500
     y_max = 5000
 end
@@ -361,9 +361,6 @@ if @isdefined annotation_dict
     f
 end |> x -> WideCell(x; max_width = 1600)
 
-# ╔═╡ 16c86391-549f-4aa9-af3f-eb9ddfd44a7a
-findfirst(x -> !(x isa Vector{Tuple{Int64, Int64}}), annotation_dict)
-
 # ╔═╡ 94418555-83fb-4610-a04d-89d2823d3efb
 [k => v for (k, v) in error_dict if !ismissing(v)]
 
@@ -427,10 +424,9 @@ end
 # ╟─08de3104-630e-4792-836f-0ab11d324470
 # ╟─2a4561ca-f05e-4fba-b14a-2d5ea5de9f96
 # ╟─c9f608c8-0088-4667-909e-2ed0cc0d1866
-# ╠═16c86391-549f-4aa9-af3f-eb9ddfd44a7a
 # ╟─78a5a17f-8064-437f-bdf5-6ac47fe0741c
 # ╟─2e87558f-1c4f-40d7-b98f-8aa4e8858bb8
-# ╟─ca219486-3522-4f3a-837b-b3fc99b2e670
+# ╠═ca219486-3522-4f3a-837b-b3fc99b2e670
 # ╠═94418555-83fb-4610-a04d-89d2823d3efb
 # ╟─1053aa28-910d-49b0-a85b-ab01d2610f9c
 # ╟─150e2c5e-9828-4180-98b1-cb027d76cba6
