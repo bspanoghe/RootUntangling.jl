@@ -142,8 +142,7 @@ function fix_groundtruth(file::String)
             )
         end
     end
-    println(ann_correction_dict) #!
-
+    
     isempty(ann_correction_dict) || @info "$(length(ann_correction_dict)) root indices corrected to ensure sequential root indices"
     for i in 2:size(datamat, 1)
         datamat[i, 2] = replace(datamat[i, 2], collect(ann_correction_dict)...)
